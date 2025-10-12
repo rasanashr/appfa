@@ -1,0 +1,100 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  password  String
+  role      Role     @default(USER)
+  posts     Post[]
+  pages     Page[]
+  media     Media[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Post {
+  id              Int        @id @default(autoincrement())
+  title           String
+  slug            String     @unique
+  body            String     @db.LongText
+  author          User       @relation(fields: [authorId], references: [id])
+  authorId        Int
+  category        Category   @relation(fields: [categoryId], references: [id])
+  categoryId      Int
+  featuredImage   String?
+  video           String?
+  tags            Tag[]
+  postType        PostType   @default(ARTICLE)
+  seoTitle        String?
+  seoDescription  String?
+  schema          Json?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model Page {
+  id              Int      @id @default(autoincrement())
+  title           String
+  slug            String   @unique
+  body            String   @db.LongText
+  author          User     @relation(fields: [authorId], references: [id])
+  authorId        Int
+  featuredImage   String?
+  seoTitle        String?
+  seoDescription  String?
+  schema          Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Category {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  slug  String @unique
+  posts Post[]
+}
+
+model Tag {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  slug  String @unique
+  posts Post[]
+}
+
+model Media {
+  id          Int       @id @default(autoincrement())
+  url         String
+  type        MediaType
+  altText     String?
+  uploadedBy  User      @relation(fields: [uploadedById], references: [id])
+  uploadedById Int
+  createdAt   DateTime  @default(now())
+}
+
+enum Role {
+  USER
+  ADMIN
+  EDITOR
+  AUTHOR
+}
+
+enum PostType {
+  ARTICLE
+  NEWS
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
