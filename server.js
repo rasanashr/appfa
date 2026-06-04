@@ -1,281 +1,249 @@
-// server.js - سرور اصلی
 import express from 'express';
 import cors from 'cors';
-import multer from 'multer';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
-import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.static('public'));
+app.use(express.json());
 
-// Multer config for image upload
-const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 4 * 1024 * 1024 }, // 4MB
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-        } else {
-            cb(new Error('فقط فایل‌های تصویر مجاز هستند'));
+// ========== HTML ساده برای تست ==========
+const HTML_FORM = `
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>پیرایشگر - تست API</title>
+    <style>
+        body { font-family: tahoma; background: #0f172a; color: white; padding: 2rem; }
+        textarea { width: 100%; background: #1e293b; border: 1px solid #334155; color: white; padding: 1rem; border-radius: 1rem; }
+        button { background: #10b981; color: #0f172a; padding: 0.75rem 2rem; border: none; border-radius: 1rem; font-weight: bold; cursor: pointer; margin-top: 1rem; }
+        pre { background: #1e293b; padding: 1rem; border-radius: 1rem; overflow-x: auto; margin-top: 1rem; }
+        .error { color: #ef4444; }
+        .success { color: #10b981; }
+        .api-key-input { width: 100%; background: #1e293b; border: 1px solid #334155; color: white; padding: 0.75rem; border-radius: 0.75rem; margin-bottom: 1rem; }
+        .card { background: #1e293b; padding: 1.5rem; border-radius: 1.5rem; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <div style="max-width: 800px; margin: 0 auto;">
+        <h1>🖊️ پیرایشگر متن</h1>
+        
+        <div class="card">
+            <label>🔑 کلید API (اختیاری - می‌تونی اینجا وارد کنی):</label>
+            <input type="text" id="apiKey" class="api-key-input" placeholder="AIzaSy..." value="">
+            <small style="color: #94a3b8;">اگه خالی بذاری، از کلید سرور استفاده میشه</small>
+        </div>
+        
+        <div class="card">
+            <label>📝 متن خود را وارد کن:</label>
+            <textarea id="text" rows="5" placeholder="متن خبر یا یادداشت خود را اینجا بنویس..."></textarea>
+            
+            <select id="tone" style="width: 100%; background: #1e293b; border: 1px solid #334155; color: white; padding: 0.75rem; border-radius: 0.75rem; margin-top: 1rem;">
+                <option value="formal">رسمی و تحلیلی</option>
+                <option value="sensational">تیتر زرد و جذاب</option>
+                <option value="educational">آموزشی و سئو شده</option>
+            </select>
+            
+            <button onclick="rewrite()">🚀 شروع بازنویسی</button>
+        </div>
+        
+        <div id="loading" style="display: none; text-align: center; padding: 2rem;">
+            <div style="display: inline-block; width: 40px; height: 40px; border: 3px solid #10b981; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            <p>در حال پردازش با هوش مصنوعی...</p>
+        </div>
+        
+        <div id="result" style="display: none;" class="card">
+            <h2 id="title" style="color: #10b981;"></h2>
+            <div id="content" style="line-height: 1.8;"></div>
+            <div id="keywords" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem;"></div>
+        </div>
+        
+        <div id="error" style="display: none;" class="card error"></div>
+    </div>
+    
+    <style>
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
-    }
-});
-
-// Initialize Gemini
-const genAI = (apiKey) => new GoogleGenerativeAI(apiKey || process.env.GEMINI_API_KEY);
-
-// حافظه موقت برای ذخیره تاریخچه (در production از دیتابیس استفاده کن)
-let historyStore = [];
-let sessionId = Date.now().toString();
-
-// سیستم پرامپت اصلی (همانند نسخه فرانت‌اند)
-const SYSTEM_PROMPT = `
-شما یک سردبیر و خبرنگار حرفه‌ای، باسابقه و متخصص سئو (SEO) در وب فارسی هستید.
-وظیفه شما بازنویسی متن‌های دریافتی به شیوه‌ای کاملاً حرفه‌ای، جذاب، خبرنگاری و کاملاً بهینه‌سازی شده برای موتورهای جستجو است.
-
-قوانین سفت و سخت نگارشی و فرمت‌بندی:
-۱. علائم نگارشی را کاملاً در مکان مناسب قرار دهید.
-۲. رعایت دقیق نیم‌فاصله‌ها الزامی است.
-۳. به هیچ وجه از ساختارهای مارک‌داون استفاده نکنید. متن خروجی باید کاملاً در قالب کدهای استاندارد HTML تمیز باشد.
-۴. یک عنوان جذاب با نرخ کلیک بالا به زبان روزنامه‌نگاری سئومحور ایجاد کنید.
-۵. دقیقاً بین ۳ تا ۴ کلمه کلیدی استراتژیک استخراج کنید.
-۶. یک پرامپت انگلیسی برای تصویرساز Imagen 4 بنویسید (سبک تصویرسازی برداری مدرن یا عکاسی دراماتیک ژورنالیستی).
-
-خروجی را دقیقاً در قالب JSON زیر برگردانید:
-{
-    "title": "عنوان سئو شده به فارسی",
-    "content": "متن بازنویسی شده با تگ‌های HTML معتبر",
-    "keywords": ["کلیدواژه1", "کلیدواژه2", "کلیدواژه3"],
-    "image_prompt": "English prompt for image generation"
-}
+    </style>
+    
+    <script>
+        async function rewrite() {
+            const text = document.getElementById('text').value;
+            const tone = document.getElementById('tone').value;
+            const apiKey = document.getElementById('apiKey').value;
+            
+            if (!text.trim()) {
+                alert('لطفاً متن را وارد کن');
+                return;
+            }
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            
+            try {
+                console.log('Sending request...');
+                const response = await fetch('/api/rewrite', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        text: text, 
+                        tone: tone, 
+                        grammarStrictness: 'strict',
+                        apiKey: apiKey || undefined
+                    })
+                });
+                
+                console.log('Response status:', response.status);
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                if (response.ok && data.success) {
+                    document.getElementById('title').textContent = data.data.title;
+                    document.getElementById('content').innerHTML = data.data.content;
+                    
+                    const keywordsDiv = document.getElementById('keywords');
+                    keywordsDiv.innerHTML = '';
+                    data.data.keywords.forEach(kw => {
+                        const span = document.createElement('span');
+                        span.style.cssText = 'background: #10b98120; color: #10b981; padding: 0.25rem 0.75rem; border-radius: 2rem; font-size: 0.875rem;';
+                        span.textContent = '#' + kw;
+                        keywordsDiv.appendChild(span);
+                    });
+                    
+                    document.getElementById('result').style.display = 'block';
+                } else {
+                    throw new Error(data.error || 'خطای ناشناخته');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                const errorDiv = document.getElementById('error');
+                errorDiv.innerHTML = \`❌ خطا: \${error.message}<br><br>
+                <small>راه‌حل‌ها:<br>
+                1. کلید API معتبر را وارد کن<br>
+                2. مطمئن شو سرویس Gemini فعال است<br>
+                3. چند دقیقه دیگه دوباره تلاش کن</small>\`;
+                errorDiv.style.display = 'block';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
 `;
 
-// اندپوینت بازنویسی متن
+// ========== اندپوینت‌های سرور ==========
+
+app.get('/', (req, res) => {
+    res.send(HTML_FORM);
+});
+
 app.post('/api/rewrite', async (req, res) => {
     try {
         const { text, tone, grammarStrictness, apiKey } = req.body;
+        
+        console.log('📝 Received request:', { textLength: text?.length, tone, hasApiKey: !!apiKey });
         
         if (!text || text.trim().length === 0) {
             return res.status(400).json({ error: 'متن ورودی الزامی است' });
         }
 
+        // اولویت: apiKey کاربر > متغیر محیطی
         const activeApiKey = apiKey || process.env.GEMINI_API_KEY;
-        if (!activeApiKey) {
-            return res.status(400).json({ error: 'کلید API الزامی است' });
-        }
-
-        const genAIClient = genAI(activeApiKey);
-        const model = genAIClient.getGenerativeModel({ 
-            model: "gemini-2.0-flash-exp",
-            generationConfig: {
-                responseMimeType: "application/json",
-                temperature: 0.7,
-                topP: 0.95
-            }
-        });
-
-        const userPrompt = `
-لطفاً متن زیر را با لحن "${tone}" و سخت‌گیری سجاوندی "${grammarStrictness}" بازنویسی کنید.
-متن خام جهت پردازش:
-"""
-${text}
-"""
-        `;
-
-        const result = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }
-        });
-
-        const response = result.response;
-        const rawResponse = response.text();
         
-        // Parse JSON response
+        console.log('🔑 API Key status:', activeApiKey ? '✅ موجود' : '❌ وجود ندارد');
+        
+        if (!activeApiKey) {
+            return res.status(400).json({ 
+                error: 'کلید API تنظیم نشده است. لطفاً کلید خود را در کادر بالا وارد کنید یا متغیر محیطی GEMINI_API_KEY را تنظیم نمایید.' 
+            });
+        }
+        
+        // بررسی فرمت کلید
+        if (!activeApiKey.startsWith('AIza')) {
+            console.warn('⚠️ API Key format seems invalid:', activeApiKey.substring(0, 10) + '...');
+        }
+        
+        const genAI = new GoogleGenerativeAI(activeApiKey);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // استفاده از مدل پایدارتر
+        
+        const prompt = `تو یک خبرنگار حرفه‌ای سئو هستی. متن زیر را با لحن "${tone}" بازنویسی کن.
+
+متن: ${text}
+
+خروجی را دقیقاً در قالب JSON زیر برگردان (فقط JSON، هیچ متن دیگری):
+{
+    "title": "عنوان جذاب و سئو شده به فارسی",
+    "content": "متن بازنویسی شده با تگ‌های HTML (h2, h3, p, strong)",
+    "keywords": ["کلیدواژه1", "کلیدواژه2", "کلیدواژه3"]
+}`;
+
+        console.log('🤖 Sending to Gemini...');
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+        const rawText = response.text();
+        
+        console.log('📥 Gemini response:', rawText.substring(0, 200));
+        
+        // استخراج JSON از پاسخ
         let parsedData;
         try {
-            parsedData = JSON.parse(rawResponse);
+            // تلاش برای پارس کردن مستقیم
+            parsedData = JSON.parse(rawText);
         } catch (e) {
-            // Fallback: extract JSON from text if needed
-            const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+            // استخراج با رجکس
+            const jsonMatch = rawText.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 parsedData = JSON.parse(jsonMatch[0]);
             } else {
-                throw new Error('فرمت پاسخ نامعتبر است');
+                throw new Error('پاسخ Gemini فرمت JSON ندارد');
             }
         }
-
-        // Validate keywords count
-        if (!parsedData.keywords || parsedData.keywords.length < 3 || parsedData.keywords.length > 4) {
-            parsedData.keywords = parsedData.keywords?.slice(0, 4) || ["پیش‌فرض", "کلیدواژه", "سئو"];
-        }
-
-        // Save to history
-        const historyItem = {
-            id: Date.now(),
-            timestamp: new Date().toISOString(),
-            rawInput: text,
-            title: parsedData.title,
-            content: parsedData.content,
-            keywords: parsedData.keywords,
-            image_prompt: parsedData.image_prompt,
-            tone,
-            grammarStrictness
-        };
         
-        historyStore.unshift(historyItem);
-        if (historyStore.length > 50) historyStore.pop();
-
+        // اعتبارسنجی
+        if (!parsedData.title || !parsedData.content || !parsedData.keywords) {
+            throw new Error('پاسخ کامل نیست');
+        }
+        
         res.json({
             success: true,
-            data: parsedData,
-            historyId: historyItem.id
+            data: parsedData
         });
-
+        
     } catch (error) {
-        console.error('Rewrite Error:', error);
-        res.status(500).json({ 
-            error: 'خطا در بازنویسی متن',
-            details: error.message 
-        });
+        console.error('❌ Error details:', error);
+        
+        // تشخیص نوع خطا
+        let errorMessage = error.message;
+        if (error.message.includes('401') || error.message.includes('API key')) {
+            errorMessage = 'کلید API نامعتبر است. لطفاً یک کلید معتبر از Google AI Studio دریافت کن.';
+        } else if (error.message.includes('429')) {
+            errorMessage = 'محدودیت درخواست. چند دقیقه صبر کن و دوباره تلاش کن.';
+        } else if (error.message.includes('503')) {
+            errorMessage = 'سرویس Gemini در دسترس نیست. کمی بعد تلاش کن.';
+        }
+        
+        res.status(500).json({ error: errorMessage });
     }
 });
 
-// اندپوینت دریافت تاریخچه
-app.get('/api/history', (req, res) => {
-    res.json({
-        success: true,
-        history: historyStore
-    });
-});
-
-// اندپوینت دریافت یک آیتم خاص از تاریخچه
-app.get('/api/history/:id', (req, res) => {
-    const item = historyStore.find(h => h.id == req.params.id);
-    if (item) {
-        res.json({ success: true, data: item });
-    } else {
-        res.status(404).json({ error: 'آیتم یافت نشد' });
-    }
-});
-
-// اندپوینت حذف تاریخچه
-app.delete('/api/history', (req, res) => {
-    historyStore = [];
-    res.json({ success: true, message: 'تاریخچه پاک شد' });
-});
-
-// اندپوینت تولید تصویر با Imagen 4
-app.post('/api/generate-image', upload.single('referenceImage'), async (req, res) => {
-    try {
-        const { prompt, title, apiKey, imageUrl, imageSource } = req.body;
-        const referenceImage = req.file;
-        
-        let finalPrompt = prompt;
-        const activeApiKey = apiKey || process.env.GEMINI_API_KEY;
-        
-        if (!activeApiKey) {
-            return res.status(400).json({ error: 'کلید API الزامی است' });
-        }
-
-        const genAIClient = genAI(activeApiKey);
-
-        // اگر تصویر مرجع داریم، اول با Gemini Vision آنالیز کن
-        if (imageSource === 'upload' && referenceImage) {
-            const visionModel = genAIClient.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
-            
-            const base64Image = referenceImage.buffer.toString('base64');
-            const mimeType = referenceImage.mimetype;
-            
-            const visionPrompt = `
-            Analyze this image in relation to the news article title: "${title}". 
-            Create a highly detailed, professional, and modern editorial featured image prompt in English for Imagen 4. 
-            The prompt should recreate and improve this exact visual concept to match the news title, 
-            aiming for a professional, crisp news illustration or photo, with 16:9 ratio. 
-            Do not output any text in the image. Return ONLY the English prompt.
-            `;
-            
-            const visionResult = await visionModel.generateContent([
-                { text: visionPrompt },
-                { inlineData: { mimeType, data: base64Image } }
-            ]);
-            
-            const enhancedPrompt = visionResult.response.text();
-            if (enhancedPrompt && enhancedPrompt.length > 10) {
-                finalPrompt = enhancedPrompt.trim();
-            }
-        } 
-        else if (imageSource === 'url' && imageUrl) {
-            finalPrompt = `${prompt}. Recreate the concept inspired by this reference: ${imageUrl}`;
-        }
-
-        if (!finalPrompt || finalPrompt.length < 10) {
-            finalPrompt = `Editorial featured news image, clean professional digital art style, representing theme: ${title}, beautiful colors, 16:9 widescreen layout, highly detailed, no text.`;
-        }
-
-        // تولید تصویر با Imagen 4
-        const imagenModel = genAIClient.getGenerativeModel({ model: "imagen-3.0-generate-001" });
-        
-        const imageResult = await imagenModel.generateContent({
-            contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
-            generationConfig: {
-                temperature: 1.0,
-                candidateCount: 1,
-                aspectRatio: "16:9",
-                outputMimeType: "image/png"
-            }
-        });
-
-        const generatedImage = imageResult.response;
-        const imageBase64 = generatedImage.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        
-        if (imageBase64) {
-            res.json({
-                success: true,
-                imageData: `data:image/png;base64,${imageBase64}`,
-                usedPrompt: finalPrompt
-            });
-        } else {
-            throw new Error('تصویری تولید نشد');
-        }
-
-    } catch (error) {
-        console.error('Image Generation Error:', error);
-        res.status(500).json({ 
-            error: 'خطا در تولید تصویر',
-            details: error.message 
-        });
-    }
-});
-
-// اندپوینت بررسی سلامت
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 
-        version: '1.0.0',
-        historyCount: historyStore.length,
-        sessionId
+        hasApiKey: !!process.env.GEMINI_API_KEY,
+        message: 'سرور فعال است'
     });
 });
 
-// شروع سرور
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📝 API endpoints:`);
-    console.log(`   POST   /api/rewrite       - بازنویسی متن`);
-    console.log(`   POST   /api/generate-image - تولید تصویر`);
-    console.log(`   GET    /api/history       - دریافت تاریخچه`);
-    console.log(`   DELETE /api/history       - پاک کردن تاریخچه`);
+    console.log(`\n✅ Server running on http://localhost:${PORT}`);
+    console.log(`🔑 API Key configured: ${process.env.GEMINI_API_KEY ? '✅ بله' : '❌ خیر'}`);
+    console.log(`📝 Open http://localhost:${PORT} in your browser\n`);
 });
