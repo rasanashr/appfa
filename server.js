@@ -8,7 +8,7 @@ const cors = require('cors');
 const { URL } = require('url');
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // Ensure directories exist
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
@@ -69,7 +69,7 @@ app.post('/api/process', async (req, res) => {
             method: 'get',
             url: videoUrl,
             responseType: 'stream',
-            timeout: 30000, // 30 seconds timeout
+            timeout: 60000, // 60 seconds timeout
             maxContentLength: 100 * 1024 * 1024 // 100MB limit
         });
 
@@ -80,7 +80,6 @@ app.post('/api/process', async (req, res) => {
             processingStatus[id].status = 'transcoding';
 
             // 2. Transcode to multi-bitrate HLS
-            // For simplicity in this demo, we'll do 360p and 720p
             const command = ffmpeg(videoPath)
                 .outputOptions([
                     '-filter_complex [0:v]split=2[v1,v2];[v1]scale=w=1280:h=720[v1out];[v2]scale=w=640:h=360[v2out]',
@@ -90,7 +89,7 @@ app.post('/api/process', async (req, res) => {
                     '-map a:0 -c:a:1 aac -b:a:1 96k',
                     '-f hls',
                     '-hls_time 10',
-                    '-hls_playlist_type disc',
+                    '-hls_playlist_type vod',
                     '-hls_flags independent_segments',
                     '-hls_segment_filename', path.join(outputDir, 'stream_%v_%03d.ts'),
                     '-master_pl_name master.m3u8',
@@ -137,21 +136,25 @@ setInterval(() => {
     const now = Date.now();
     const maxAge = 3600000; // 1 hour
 
-    fs.readdirSync(UPLOADS_DIR).forEach(file => {
-        const filePath = path.join(UPLOADS_DIR, file);
-        const stats = fs.statSync(filePath);
-        if (now - stats.mtimeMs > maxAge) {
-            fs.unlinkSync(filePath);
-        }
-    });
+    try {
+        fs.readdirSync(UPLOADS_DIR).forEach(file => {
+            const filePath = path.join(UPLOADS_DIR, file);
+            const stats = fs.statSync(filePath);
+            if (now - stats.mtimeMs > maxAge) {
+                fs.unlinkSync(filePath);
+            }
+        });
 
-    fs.readdirSync(PROCESSED_DIR).forEach(dir => {
-        const dirPath = path.join(PROCESSED_DIR, dir);
-        const stats = fs.statSync(dirPath);
-        if (now - stats.mtimeMs > maxAge) {
-            fs.rmSync(dirPath, { recursive: true, force: true });
-        }
-    });
+        fs.readdirSync(PROCESSED_DIR).forEach(dir => {
+            const dirPath = path.join(PROCESSED_DIR, dir);
+            const stats = fs.statSync(dirPath);
+            if (now - stats.mtimeMs > maxAge) {
+                fs.rmSync(dirPath, { recursive: true, force: true });
+            }
+        });
+    } catch (e) {
+        console.error('Cleanup error:', e);
+    }
 }, 3600000);
 
 app.listen(port, () => {
