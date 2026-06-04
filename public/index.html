@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>پلیر ویدیو حرفه‌ای | پخش هوشمند</title>
+    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+    <!-- Adding a professional theme for Video.js -->
+    <link href="https://unpkg.com/@videojs/themes@1.0.1/dist/city/index.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">🎬</div>
+            <h1>پخش‌کننده ویدیو هوشمند</h1>
+            <p>لینک ویدیو را وارد کنید تا با کیفیت متناسب با سرعت اینترنت شما (Adaptive) پخش شود.</p>
+        </header>
+
+        <main>
+            <div class="input-section">
+                <input type="text" id="videoUrl" placeholder="لینک مستقیم ویدیو (مثلا MP4) را وارد کنید..." dir="ltr">
+                <button id="processBtn">
+                    <span class="btn-text">بارگذاری و پردازش</span>
+                </button>
+            </div>
+
+            <div id="statusContainer" class="hidden">
+                <div class="status-card">
+                    <div class="loader"></div>
+                    <p id="statusText">در حال آماده‌سازی...</p>
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div id="progressFill"></div>
+                        </div>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="playerContainer" class="hidden">
+                <div class="video-wrapper">
+                    <video id="my-video" class="video-js vjs-theme-city vjs-big-play-centered" controls preload="auto" width="800" height="450">
+                        <p class="vjs-no-js">
+                            برای مشاهده این ویدیو باید جاوااسکریپت را فعال کنید.
+                        </p>
+                    </video>
+                </div>
+                <div class="actions">
+                    <a id="downloadBtn" class="btn-download" href="#" download>
+                        <span class="icon">📥</span> دانلود ویدیو از سرور اصلی
+                    </a>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>تمامی ویدیوها پس از یک ساعت از روی سرور پاک می‌شوند.</p>
+        </footer>
+    </div>
+
+    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
