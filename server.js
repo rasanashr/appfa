@@ -1,162 +1,281 @@
-const express = require('express');
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const ffmpeg = require('fluent-ffmpeg');
-const { v4: uuidv4 } = require('uuid');
-const cors = require('cors');
-const { URL } = require('url');
+// server.js - سرور اصلی
+import express from 'express';
+import cors from 'cors';
+import multer from 'multer';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import dotenv from 'dotenv';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
-// Ensure directories exist
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
-const PROCESSED_DIR = path.join(__dirname, 'processed');
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.static('public'));
 
-[UPLOADS_DIR, PROCESSED_DIR].forEach(dir => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+// Multer config for image upload
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 4 * 1024 * 1024 }, // 4MB
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('فقط فایل‌های تصویر مجاز هستند'));
+        }
     }
 });
 
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
-app.use('/processed', express.static('processed'));
-app.use('/downloads', express.static('uploads'));
+// Initialize Gemini
+const genAI = (apiKey) => new GoogleGenerativeAI(apiKey || process.env.GEMINI_API_KEY);
 
-// Progress tracking
-const processingStatus = {};
+// حافظه موقت برای ذخیره تاریخچه (در production از دیتابیس استفاده کن)
+let historyStore = [];
+let sessionId = Date.now().toString();
 
-// Basic SSRF protection - block common internal IP ranges
-function isSafeUrl(urlString) {
-    try {
-        const url = new URL(urlString);
-        const hostname = url.hostname;
-        
-        // Block private IP ranges and localhost
-        const privateIpRegex = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|::1|localhost)/;
-        if (privateIpRegex.test(hostname)) {
-            return false;
-        }
-        return ['http:', 'https:'].includes(url.protocol);
-    } catch (e) {
-        return false;
-    }
+// سیستم پرامپت اصلی (همانند نسخه فرانت‌اند)
+const SYSTEM_PROMPT = `
+شما یک سردبیر و خبرنگار حرفه‌ای، باسابقه و متخصص سئو (SEO) در وب فارسی هستید.
+وظیفه شما بازنویسی متن‌های دریافتی به شیوه‌ای کاملاً حرفه‌ای، جذاب، خبرنگاری و کاملاً بهینه‌سازی شده برای موتورهای جستجو است.
+
+قوانین سفت و سخت نگارشی و فرمت‌بندی:
+۱. علائم نگارشی را کاملاً در مکان مناسب قرار دهید.
+۲. رعایت دقیق نیم‌فاصله‌ها الزامی است.
+۳. به هیچ وجه از ساختارهای مارک‌داون استفاده نکنید. متن خروجی باید کاملاً در قالب کدهای استاندارد HTML تمیز باشد.
+۴. یک عنوان جذاب با نرخ کلیک بالا به زبان روزنامه‌نگاری سئومحور ایجاد کنید.
+۵. دقیقاً بین ۳ تا ۴ کلمه کلیدی استراتژیک استخراج کنید.
+۶. یک پرامپت انگلیسی برای تصویرساز Imagen 4 بنویسید (سبک تصویرسازی برداری مدرن یا عکاسی دراماتیک ژورنالیستی).
+
+خروجی را دقیقاً در قالب JSON زیر برگردانید:
+{
+    "title": "عنوان سئو شده به فارسی",
+    "content": "متن بازنویسی شده با تگ‌های HTML معتبر",
+    "keywords": ["کلیدواژه1", "کلیدواژه2", "کلیدواژه3"],
+    "image_prompt": "English prompt for image generation"
 }
+`;
 
-app.post('/api/process', async (req, res) => {
-    const { videoUrl } = req.body;
-    if (!videoUrl || !isSafeUrl(videoUrl)) {
-        return res.status(400).json({ error: 'Valid public Video URL is required' });
-    }
-
-    const id = uuidv4();
-    const videoPath = path.join(UPLOADS_DIR, `${id}.mp4`);
-    const outputDir = path.join(PROCESSED_DIR, id);
-    
-    if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
-    }
-
-    processingStatus[id] = { status: 'downloading', progress: 0 };
-    res.json({ id });
-
+// اندپوینت بازنویسی متن
+app.post('/api/rewrite', async (req, res) => {
     try {
-        // 1. Download the video
-        const response = await axios({
-            method: 'get',
-            url: videoUrl,
-            responseType: 'stream',
-            timeout: 60000, // 60 seconds timeout
-            maxContentLength: 100 * 1024 * 1024 // 100MB limit
+        const { text, tone, grammarStrictness, apiKey } = req.body;
+        
+        if (!text || text.trim().length === 0) {
+            return res.status(400).json({ error: 'متن ورودی الزامی است' });
+        }
+
+        const activeApiKey = apiKey || process.env.GEMINI_API_KEY;
+        if (!activeApiKey) {
+            return res.status(400).json({ error: 'کلید API الزامی است' });
+        }
+
+        const genAIClient = genAI(activeApiKey);
+        const model = genAIClient.getGenerativeModel({ 
+            model: "gemini-2.0-flash-exp",
+            generationConfig: {
+                responseMimeType: "application/json",
+                temperature: 0.7,
+                topP: 0.95
+            }
         });
 
-        const writer = fs.createWriteStream(videoPath);
-        response.data.pipe(writer);
+        const userPrompt = `
+لطفاً متن زیر را با لحن "${tone}" و سخت‌گیری سجاوندی "${grammarStrictness}" بازنویسی کنید.
+متن خام جهت پردازش:
+"""
+${text}
+"""
+        `;
 
-        writer.on('finish', () => {
-            processingStatus[id].status = 'transcoding';
-            
-            // 2. Transcode to multi-bitrate HLS
-            const command = ffmpeg(videoPath)
-                .outputOptions([
-                    '-filter_complex [0:v]split=2[v1,v2];[v1]scale=w=1280:h=720[v1out];[v2]scale=w=640:h=360[v2out]',
-                    '-map [v1out]', '-c:v:0 libx264 -b:v:0 2800k -maxrate:v:0 2996k -bufsize:v:0 4200k',
-                    '-map [v2out]', '-c:v:1 libx264 -b:v:1 800k -maxrate:v:1 856k -bufsize:v:1 1200k',
-                    '-map a:0 -c:a:0 aac -b:a:0 128k',
-                    '-map a:0 -c:a:1 aac -b:a:1 96k',
-                    '-f hls',
-                    '-hls_time 10',
-                    '-hls_playlist_type vod',
-                    '-hls_flags independent_segments',
-                    '-hls_segment_filename', path.join(outputDir, 'stream_%v_%03d.ts'),
-                    '-master_pl_name master.m3u8',
-                    '-var_stream_map', 'v:0,a:0 v:1,a:1'
-                ])
-                .output(path.join(outputDir, 'playlist_%v.m3u8'))
-                .on('progress', (progress) => {
-                    processingStatus[id].progress = progress.percent;
-                })
-                .on('end', () => {
-                    processingStatus[id].status = 'completed';
-                    processingStatus[id].playlistUrl = `/processed/${id}/master.m3u8`;
-                    processingStatus[id].downloadUrl = `/downloads/${id}.mp4`;
-                })
-                .on('error', (err) => {
-                    console.error('FFmpeg error:', err);
-                    processingStatus[id].status = 'error';
-                });
-
-            command.run();
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }
         });
 
-        writer.on('error', (err) => {
-            console.error('Download error:', err);
-            processingStatus[id].status = 'error';
+        const response = result.response;
+        const rawResponse = response.text();
+        
+        // Parse JSON response
+        let parsedData;
+        try {
+            parsedData = JSON.parse(rawResponse);
+        } catch (e) {
+            // Fallback: extract JSON from text if needed
+            const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                parsedData = JSON.parse(jsonMatch[0]);
+            } else {
+                throw new Error('فرمت پاسخ نامعتبر است');
+            }
+        }
+
+        // Validate keywords count
+        if (!parsedData.keywords || parsedData.keywords.length < 3 || parsedData.keywords.length > 4) {
+            parsedData.keywords = parsedData.keywords?.slice(0, 4) || ["پیش‌فرض", "کلیدواژه", "سئو"];
+        }
+
+        // Save to history
+        const historyItem = {
+            id: Date.now(),
+            timestamp: new Date().toISOString(),
+            rawInput: text,
+            title: parsedData.title,
+            content: parsedData.content,
+            keywords: parsedData.keywords,
+            image_prompt: parsedData.image_prompt,
+            tone,
+            grammarStrictness
+        };
+        
+        historyStore.unshift(historyItem);
+        if (historyStore.length > 50) historyStore.pop();
+
+        res.json({
+            success: true,
+            data: parsedData,
+            historyId: historyItem.id
         });
 
     } catch (error) {
-        console.error('Error processing video:', error);
-        processingStatus[id].status = 'error';
+        console.error('Rewrite Error:', error);
+        res.status(500).json({ 
+            error: 'خطا در بازنویسی متن',
+            details: error.message 
+        });
     }
 });
 
-app.get('/api/status/:id', (req, res) => {
-    const status = processingStatus[req.params.id];
-    if (!status) {
-        return res.status(404).json({ error: 'Not found' });
-    }
-    res.json(status);
+// اندپوینت دریافت تاریخچه
+app.get('/api/history', (req, res) => {
+    res.json({
+        success: true,
+        history: historyStore
+    });
 });
 
-// Simple cleanup every hour
-setInterval(() => {
-    const now = Date.now();
-    const maxAge = 3600000; // 1 hour
+// اندپوینت دریافت یک آیتم خاص از تاریخچه
+app.get('/api/history/:id', (req, res) => {
+    const item = historyStore.find(h => h.id == req.params.id);
+    if (item) {
+        res.json({ success: true, data: item });
+    } else {
+        res.status(404).json({ error: 'آیتم یافت نشد' });
+    }
+});
 
+// اندپوینت حذف تاریخچه
+app.delete('/api/history', (req, res) => {
+    historyStore = [];
+    res.json({ success: true, message: 'تاریخچه پاک شد' });
+});
+
+// اندپوینت تولید تصویر با Imagen 4
+app.post('/api/generate-image', upload.single('referenceImage'), async (req, res) => {
     try {
-        fs.readdirSync(UPLOADS_DIR).forEach(file => {
-            const filePath = path.join(UPLOADS_DIR, file);
-            const stats = fs.statSync(filePath);
-            if (now - stats.mtimeMs > maxAge) {
-                fs.unlinkSync(filePath);
+        const { prompt, title, apiKey, imageUrl, imageSource } = req.body;
+        const referenceImage = req.file;
+        
+        let finalPrompt = prompt;
+        const activeApiKey = apiKey || process.env.GEMINI_API_KEY;
+        
+        if (!activeApiKey) {
+            return res.status(400).json({ error: 'کلید API الزامی است' });
+        }
+
+        const genAIClient = genAI(activeApiKey);
+
+        // اگر تصویر مرجع داریم، اول با Gemini Vision آنالیز کن
+        if (imageSource === 'upload' && referenceImage) {
+            const visionModel = genAIClient.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+            
+            const base64Image = referenceImage.buffer.toString('base64');
+            const mimeType = referenceImage.mimetype;
+            
+            const visionPrompt = `
+            Analyze this image in relation to the news article title: "${title}". 
+            Create a highly detailed, professional, and modern editorial featured image prompt in English for Imagen 4. 
+            The prompt should recreate and improve this exact visual concept to match the news title, 
+            aiming for a professional, crisp news illustration or photo, with 16:9 ratio. 
+            Do not output any text in the image. Return ONLY the English prompt.
+            `;
+            
+            const visionResult = await visionModel.generateContent([
+                { text: visionPrompt },
+                { inlineData: { mimeType, data: base64Image } }
+            ]);
+            
+            const enhancedPrompt = visionResult.response.text();
+            if (enhancedPrompt && enhancedPrompt.length > 10) {
+                finalPrompt = enhancedPrompt.trim();
+            }
+        } 
+        else if (imageSource === 'url' && imageUrl) {
+            finalPrompt = `${prompt}. Recreate the concept inspired by this reference: ${imageUrl}`;
+        }
+
+        if (!finalPrompt || finalPrompt.length < 10) {
+            finalPrompt = `Editorial featured news image, clean professional digital art style, representing theme: ${title}, beautiful colors, 16:9 widescreen layout, highly detailed, no text.`;
+        }
+
+        // تولید تصویر با Imagen 4
+        const imagenModel = genAIClient.getGenerativeModel({ model: "imagen-3.0-generate-001" });
+        
+        const imageResult = await imagenModel.generateContent({
+            contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
+            generationConfig: {
+                temperature: 1.0,
+                candidateCount: 1,
+                aspectRatio: "16:9",
+                outputMimeType: "image/png"
             }
         });
 
-        fs.readdirSync(PROCESSED_DIR).forEach(dir => {
-            const dirPath = path.join(PROCESSED_DIR, dir);
-            const stats = fs.statSync(dirPath);
-            if (now - stats.mtimeMs > maxAge) {
-                fs.rmSync(dirPath, { recursive: true, force: true });
-            }
+        const generatedImage = imageResult.response;
+        const imageBase64 = generatedImage.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        
+        if (imageBase64) {
+            res.json({
+                success: true,
+                imageData: `data:image/png;base64,${imageBase64}`,
+                usedPrompt: finalPrompt
+            });
+        } else {
+            throw new Error('تصویری تولید نشد');
+        }
+
+    } catch (error) {
+        console.error('Image Generation Error:', error);
+        res.status(500).json({ 
+            error: 'خطا در تولید تصویر',
+            details: error.message 
         });
-    } catch (e) {
-        console.error('Cleanup error:', e);
     }
-}, 3600000);
+});
 
-app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
+// اندپوینت بررسی سلامت
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        version: '1.0.0',
+        historyCount: historyStore.length,
+        sessionId
+    });
+});
+
+// شروع سرور
+app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📝 API endpoints:`);
+    console.log(`   POST   /api/rewrite       - بازنویسی متن`);
+    console.log(`   POST   /api/generate-image - تولید تصویر`);
+    console.log(`   GET    /api/history       - دریافت تاریخچه`);
+    console.log(`   DELETE /api/history       - پاک کردن تاریخچه`);
 });

@@ -1,30 +1,21 @@
 {
-  "name": "app",
+  "name": "pirayeshgar-api",
   "version": "1.0.0",
-  "description": "Professional Adaptive Video Player",
+  "type": "module",
+  "description": "هوشمندترین ویرایشگر و بازنویس متن با Gemini AI",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "echo 'No build step required'",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "npm install"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/rasanashr/appfa.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/rasanashr/appfa/issues"
-  },
-  "homepage": "https://github.com/rasanashr/appfa#readme",
   "dependencies": {
-    "axios": "^1.7.9",
+    "@google/generative-ai": "^0.21.0",
     "cors": "^2.8.5",
-    "express": "^4.21.2",
-    "fluent-ffmpeg": "^2.1.3",
-    "uuid": "^11.0.3"
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "multer": "^1.4.5-lts.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
