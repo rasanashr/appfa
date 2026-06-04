@@ -1,1097 +1,237 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl" class="h-full bg-slate-900 text-slate-100">
+<html dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>پیرایشگر | ویرایشگر و بازنویس هوشمند خبرنگاری</title>
-    <!-- Google Fonts: Vazirmatn for beautiful Persian typography -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap" rel="stylesheet">
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <title>پیرایشگر - ویرایشگر هوشمند</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Vazirmatn', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            font-family: 'Vazirmatn', Tahoma, sans-serif;
+            padding: 20px;
+            min-height: 100vh;
         }
-        /* Custom scrollbar styling for a premium look */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 40px; }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #10b981, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
-        ::-webkit-scrollbar-track {
+        .card {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #cbd5e1;
+            font-weight: bold;
+        }
+        textarea, input, select {
+            width: 100%;
+            padding: 12px;
             background: #1e293b;
+            border: 1px solid #334155;
+            color: white;
+            border-radius: 12px;
+            font-size: 14px;
+            font-family: inherit;
         }
-        ::-webkit-scrollbar-thumb {
-            background: #475569;
-            border-radius: 4px;
+        button {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 16px;
+            width: 100%;
         }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #64748b;
+        button:hover { transform: translateY(-2px); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .result-area {
+            background: #0f172a;
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: 16px;
+        }
+        .keyword {
+            display: inline-block;
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin: 4px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #334155;
+            border-top-color: #10b981;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .api-status {
+            font-size: 12px;
+            padding: 8px;
+            border-radius: 8px;
+            margin-top: 8px;
+        }
+        .status-ok { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .status-error { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        h2 { color: #10b981; margin-bottom: 12px; font-size: 1.5rem; }
+        .hidden { display: none; }
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            padding: 16px;
+            border-radius: 12px;
+            margin-top: 16px;
         }
     </style>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#f0fdf4',
-                            100: '#dcfce7',
-                            500: '#22c55e',
-                            600: '#16a34a',
-                            700: '#15803d',
-                            glow: '#10b981'
-                        }
-                    }
-                }
-            }
-        }
-    </script>
 </head>
-<body class="h-full flex flex-col justify-between overflow-x-hidden selection:bg-brand-500 selection:text-slate-900">
-
-    <!-- Header -->
-    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50 px-4 py-4 sm:px-6 lg:px-8">
-        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
-                <div class="p-2.5 bg-gradient-to-tr from-brand-600 to-emerald-400 rounded-2xl shadow-lg shadow-brand-500/20">
-                    <i data-lucide="newspaper" class="w-7 h-7 text-white"></i>
-                </div>
-                <div>
-                    <h1 class="text-xl font-black tracking-tight bg-gradient-to-l from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">پیرایشگر متن</h1>
-                    <p class="text-xs text-slate-400 mt-0.5">بازنویس فوق‌حرفه‌ای با هوش مصنوعی و رعایت قواعد سئو وب فارسی</p>
-                </div>
-            </div>
-            
-            <div class="flex items-center gap-3">
-                <!-- API Configuration Toggle Button -->
-                <button onclick="toggleApiModal()" class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-slate-700 bg-slate-800/50 hover:bg-slate-850 hover:border-slate-600 transition text-xs font-medium text-slate-300">
-                    <i data-lucide="key" class="w-4 h-4 text-amber-400 animate-pulse"></i>
-                    <span>تنظیمات کلید API</span>
-                </button>
-                <div class="h-6 w-[1px] bg-slate-800"></div>
-                <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/50 text-xs text-slate-300">
-                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
-                    <span>مدل فعال: Gemini 3 Flash &amp; Imagen 4</span>
-                </div>
-            </div>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖊️ پیرایشگر متن هوشمند</h1>
+            <p style="color: #94a3b8; margin-top: 8px;">بازنویسی حرفه‌ای با Gemini 2.0</p>
         </div>
-    </header>
 
-    <!-- Main Content Grid -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        <!-- Left Column: Inputs & Controls (5 Cols) -->
-        <section class="lg:col-span-5 flex flex-col gap-6">
+        <div class="card">
+            <label>🔑 کلید API Gemini</label>
+            <input type="password" id="apiKey" placeholder="AIzaSy..." value="">
+            <div id="apiStatus" class="api-status"></div>
+            <small style="color: #64748b;">💡 از https://aistudio.google.com/apikey بگیر</small>
             
-            <!-- Editor Input Box -->
-            <div class="bg-slate-800/40 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 shadow-xl">
-                <div class="flex items-center justify-between border-b border-slate-700/50 pb-3">
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="file-edit" class="w-5 h-5 text-brand-500"></i>
-                        <span class="font-bold text-slate-200">متن ورودی شما</span>
-                    </div>
-                    <button onclick="clearInput()" class="text-xs text-slate-400 hover:text-rose-400 transition flex items-center gap-1">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                        <span>پاک کردن همه</span>
-                    </button>
-                </div>
-                
-                <div class="relative">
-                    <textarea 
-                        id="rawInput" 
-                        placeholder="متن اولیه، خبر خام، یادداشت یا ایده خود را در این بخش بنویسید یا بچسبانید (Paste)..." 
-                        class="w-full h-80 bg-slate-900/80 border border-slate-700/60 rounded-2xl p-4 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition leading-relaxed resize-none text-sm"
-                        oninput="updateInputStats()"></textarea>
-                    
-                    <!-- Stats badge inside editor -->
-                    <div class="absolute bottom-3 right-4 flex items-center gap-3 text-xs text-slate-500 bg-slate-900/90 px-3 py-1.5 rounded-lg border border-slate-800">
-                        <span>تعداد کاراکتر: <strong id="charCount" class="text-slate-300">0</strong></span>
-                        <span class="text-slate-700">|</span>
-                        <span>تعداد کلمات: <strong id="wordCount" class="text-slate-300">0</strong></span>
-                    </div>
-                </div>
+            <label style="margin-top: 16px;">🤖 مدل هوش مصنوعی</label>
+            <select id="model">
+                <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (سریع و جدید)</option>
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash (پایدار)</option>
+                <option value="gemini-1.5-pro">Gemini 1.5 Pro (قدرتمند)</option>
+            </select>
+        </div>
 
-                <!-- Action Controls inside Editor Area -->
-                <div class="grid grid-cols-2 gap-3 pt-2">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-400 mb-1.5">لحن نگارش خبرنگار</label>
-                        <select id="toneSelect" class="w-full bg-slate-900/80 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500">
-                            <option value="formal">گزارش خبری رسمی و تحلیلی</option>
-                            <option value="sensational">تیتر زرد و جذاب (جلب مخاطب بالا)</option>
-                            <option value="educational">مقاله‌ای و آموزشی بهینه‌شده</option>
-                            <option value="minimal">خلاصه، موجز و تأثیرگذار (شبکه‌های اجتماعی)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-400 mb-1.5">سخت‌گیری قواعد نگارش</label>
-                        <select id="grammarStrictness" class="w-full bg-slate-900/80 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500">
-                            <option value="strict">رعایت وسواس‌گونه نیم‌فاصله و سجاوندی</option>
-                            <option value="standard">استاندارد مطبوعاتی وب</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Main Action Button -->
-                <button 
-                    id="submitBtn"
-                    onclick="processRewrite()" 
-                    class="w-full py-4 mt-2 bg-gradient-to-r from-brand-600 to-emerald-500 hover:from-brand-500 hover:to-emerald-400 text-slate-900 font-extrabold rounded-2xl shadow-lg shadow-brand-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group">
-                    <i data-lucide="sparkles" class="w-5 h-5 group-hover:rotate-12 transition-transform"></i>
-                    <span>بازنویسی هوشمند و بهینه‌سازی سئو</span>
-                </button>
-            </div>
-
-            <!-- History Card -->
-            <div class="bg-slate-800/20 border border-slate-800/80 rounded-3xl p-5 flex flex-col gap-3">
-                <div class="flex items-center justify-between pb-2 border-b border-slate-850">
-                    <span class="text-xs font-bold text-slate-400 flex items-center gap-1.5">
-                        <i data-lucide="history" class="w-4 h-4 text-slate-400"></i>
-                        <span>تاریخچه بازنویسی‌های اخیر</span>
-                    </span>
-                    <button onclick="clearHistory()" class="text-[10px] text-slate-500 hover:text-rose-400 transition">پاک کردن تاریخچه</button>
-                </div>
-                <div id="historyContainer" class="max-h-48 overflow-y-auto flex flex-col gap-2 pr-1 text-xs">
-                    <!-- Dynamic history items loaded via JS -->
-                    <div class="text-slate-500 py-3 text-center">تاریخچه‌ای یافت نشد.</div>
-                </div>
-            </div>
-
-        </section>
-
-        <!-- Right Column: Outputs (7 Cols) -->
-        <section class="lg:col-span-7 flex flex-col gap-6">
-
-            <!-- Welcome / Placeholder State -->
-            <div id="placeholderState" class="bg-slate-800/30 border border-slate-800/80 border-dashed rounded-3xl p-12 text-center flex flex-col items-center justify-center gap-4 h-full min-h-[450px]">
-                <div class="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 mb-2">
-                    <i data-lucide="cpu" class="w-8 h-8"></i>
-                </div>
-                <h3 class="text-lg font-bold text-slate-300">منتظر نگارش جادویی شما...</h3>
-                <p class="text-xs text-slate-500 max-w-sm leading-relaxed">متن اولیه خود را در باکس روبرو بنویسید و روی دکمه بازنویسی کلیک کنید تا موتور هوشمند سئو پیرایشگر شروع به کار کند.</p>
-                <div class="flex flex-wrap gap-2 justify-center mt-3">
-                    <span class="text-[10px] bg-slate-800/60 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700/30">تصحیح نیم‌فاصله‌ها</span>
-                    <span class="text-[10px] bg-slate-800/60 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700/30">ایجاد عنوان کلیک‌خور</span>
-                    <span class="text-[10px] bg-slate-800/60 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700/30">سازماندهی هدینگ‌ها</span>
-                    <span class="text-[10px] bg-slate-800/60 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700/30">خلق تصاویر شاخص AI</span>
-                </div>
-            </div>
-
-            <!-- Loading State -->
-            <div id="loadingState" class="hidden bg-slate-800/30 border border-slate-800/80 rounded-3xl p-12 text-center flex flex-col items-center justify-center gap-6 h-full min-h-[450px]">
-                <div class="relative w-20 h-20">
-                    <div class="absolute inset-0 rounded-full border-4 border-slate-800"></div>
-                    <div class="absolute inset-0 rounded-full border-4 border-brand-500 border-t-transparent animate-spin"></div>
-                    <div class="absolute inset-0 flex items-center justify-center text-brand-400">
-                        <i data-lucide="newspaper" class="w-8 h-8 animate-pulse"></i>
-                    </div>
-                </div>
-                <div class="space-y-2">
-                    <h3 class="text-md font-bold text-slate-200">هوش مصنوعی در حال پردازش خبر...</h3>
-                    <p id="loadingStatusText" class="text-xs text-slate-400 animate-pulse">استخراج مفاهیم کلیدی و چینش استراتژی سئو...</p>
-                </div>
-                <!-- Mini Progress Visualizer -->
-                <div class="w-full max-w-xs bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                    <div class="bg-brand-500 h-1.5 rounded-full animate-[progress_3s_ease-in-out_infinite]" style="width: 75%"></div>
-                </div>
-            </div>
-
-            <!-- Main Result Output Area -->
-            <div id="resultState" class="hidden flex flex-col gap-6">
-
-                <!-- Simple SEO Quality Meter -->
-                <div class="bg-gradient-to-r from-slate-800 to-slate-900 border border-slate-800 p-4 rounded-2xl flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <div class="p-2 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-emerald-400">
-                            <i data-lucide="shield-check" class="w-5 h-5"></i>
-                        </div>
-                        <div>
-                            <div class="text-xs font-bold text-slate-300">گزارش آنالیز موتور نگارش</div>
-                            <div class="text-[10px] text-slate-400 mt-0.5">سئوی محتوا بر پایه آخرین آپدیت‌های الگوریتم گوگل</div>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <div class="text-center">
-                            <span class="block text-lg font-black text-emerald-400">A+</span>
-                            <span class="block text-[8px] text-slate-500 uppercase tracking-wider">امتیاز رتبه‌بندی</span>
-                        </div>
-                        <div class="h-8 w-[1px] bg-slate-800"></div>
-                        <div class="text-center">
-                            <span class="block text-xs font-bold text-brand-400">۱۰۰٪</span>
-                            <span class="block text-[8px] text-slate-500">رعایت نیم‌فاصله</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 1. Proposed SEO Title Field -->
-                <div class="bg-slate-800/40 border border-slate-800 rounded-3xl p-5 flex flex-col gap-3 shadow-lg group relative">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-black text-brand-400 uppercase tracking-widest flex items-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full bg-brand-500"></span>
-                            ۱. عنوان پیشنهادی با سئوی قوی
-                        </span>
-                        <button onclick="copyField('seoTitleText', 'copyTitleIcon')" class="text-xs text-slate-400 hover:text-brand-400 flex items-center gap-1.5 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700/50 hover:border-brand-500/40 transition">
-                            <i id="copyTitleIcon" data-lucide="copy" class="w-3.5 h-3.5"></i>
-                            <span>کپی عنوان</span>
-                        </button>
-                    </div>
-                    <textarea id="seoTitleText" class="w-full bg-slate-900/60 border border-slate-700/35 rounded-2xl p-4 text-slate-200 font-bold text-md leading-relaxed focus:ring-1 focus:ring-brand-500 focus:outline-none resize-none h-18"></textarea>
-                </div>
-
-                <!-- 2. Main Rewritten Body Content Field -->
-                <div class="bg-slate-800/40 border border-slate-800 rounded-3xl p-5 flex flex-col gap-3 shadow-lg relative">
-                    <div class="flex items-center justify-between pb-2 border-b border-slate-800">
-                        <span class="text-xs font-black text-brand-400 uppercase tracking-widest flex items-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full bg-brand-500"></span>
-                            ۲. محتوای بازنویسی شده (HTML استاندارد)
-                        </span>
-                        
-                        <div class="flex items-center gap-2">
-                            <!-- Toggle View Mode: Preview vs Raw Edit -->
-                            <div class="bg-slate-900 p-1 rounded-xl border border-slate-700/50 flex items-center gap-1">
-                                <button onclick="setBodyMode('preview')" id="btnModePreview" class="px-2.5 py-1 text-[10px] font-bold rounded-lg transition bg-brand-500 text-slate-950">نمایش وب</button>
-                                <button onclick="setBodyMode('edit')" id="btnModeEdit" class="px-2.5 py-1 text-[10px] font-medium text-slate-400 hover:text-slate-200 rounded-lg transition">ویرایش کد</button>
-                            </div>
-                            
-                            <button onclick="copyField('contentBodyRaw', 'copyBodyIcon')" class="text-xs text-slate-400 hover:text-brand-400 flex items-center gap-1.5 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700/50 hover:border-brand-500/40 transition">
-                                <i id="copyBodyIcon" data-lucide="copy" class="w-3.5 h-3.5"></i>
-                                <span>کپی کل متن</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- HTML Render Preview Mode -->
-                    <div id="contentPreviewContainer" class="w-full bg-slate-900/40 border border-slate-800/60 rounded-2xl p-5 text-slate-300 text-sm leading-8 min-h-64 prose prose-invert prose-emerald max-w-none">
-                        <!-- Rendered HTML will end up here -->
-                    </div>
-
-                    <!-- Raw Code Editor Mode -->
-                    <textarea id="contentBodyRaw" class="hidden w-full h-80 bg-slate-900/90 border border-slate-700/60 rounded-2xl p-4 text-slate-300 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-500 leading-relaxed text-sm" oninput="syncPreviewFromRaw()"></textarea>
-                </div>
-
-                <!-- 3. Suggested Keywords Field -->
-                <div class="bg-slate-800/40 border border-slate-800 rounded-3xl p-5 flex flex-col gap-3 shadow-lg relative">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-black text-brand-400 uppercase tracking-widest flex items-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full bg-brand-500"></span>
-                            ۳. کلمات کلیدی سئو و برچسب‌های مرتبط (۳ تا ۴ کلمه کلیدی برتر)
-                        </span>
-                        <button onclick="copyField('keywordsRaw', 'copyKeywordsIcon')" class="text-xs text-slate-400 hover:text-brand-400 flex items-center gap-1.5 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700/50 hover:border-brand-500/40 transition">
-                            <i id="copyKeywordsIcon" data-lucide="copy" class="w-3.5 h-3.5"></i>
-                            <span>کپی کلمات کلیدی</span>
-                        </button>
-                    </div>
-                    
-                    <!-- Interactive Badges Container -->
-                    <div id="keywordsBadges" class="flex flex-wrap gap-2 p-3 bg-slate-900/40 border border-slate-800 rounded-2xl">
-                        <!-- Dynamic Keyword Badges -->
-                    </div>
-                    <!-- Hidden textarea to facilitate easy copying of comma-separated list -->
-                    <textarea id="keywordsRaw" class="sr-only"></textarea>
-                </div>
-
-                <!-- 4. NEW: Smart Featured Image (تصویر شاخص هوشمند) -->
-                <div class="bg-slate-800/40 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4 shadow-lg relative">
-                    <div class="flex items-center justify-between pb-2 border-b border-slate-850">
-                        <span class="text-xs font-black text-brand-400 uppercase tracking-widest flex items-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                            ۴. خلق تصویر شاخص جدید با هوش مصنوعی (Imagen 4)
-                        </span>
-                    </div>
-
-                    <!-- Input Source Toggle -->
-                    <div class="grid grid-cols-3 gap-1 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 text-[11px]">
-                        <button onclick="setImageSource('text')" id="btnImgText" class="py-2 rounded-xl transition font-bold bg-brand-500 text-slate-950">
-                            بدون تصویر اولیه (براساس متن)
-                        </button>
-                        <button onclick="setImageSource('upload')" id="btnImgUpload" class="py-2 rounded-xl transition text-slate-400 hover:text-slate-200">
-                            آپلود تصویر مرجع
-                        </button>
-                        <button onclick="setImageSource('url')" id="btnImgUrl" class="py-2 rounded-xl transition text-slate-400 hover:text-slate-200">
-                            آدرس اینترنتی تصویر
-                        </button>
-                    </div>
-
-                    <!-- File Upload Input Area -->
-                    <div id="imageUploadArea" class="hidden flex flex-col items-center justify-center border-2 border-dashed border-slate-700/80 rounded-2xl p-5 bg-slate-900/30 hover:bg-slate-900/50 transition cursor-pointer relative" onclick="triggerFileInput()">
-                        <input type="file" id="imageFileInput" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
-                        <i data-lucide="upload-cloud" class="w-8 h-8 text-slate-500 mb-2"></i>
-                        <span class="text-xs text-slate-300 font-semibold" id="uploadStatusText">یک تصویر را انتخاب یا رها کنید...</span>
-                        <span class="text-[10px] text-slate-500 mt-1">حداکثر حجم فایل: ۴ مگابایت</span>
-                        
-                        <!-- Mini Preview of Uploaded Reference Image -->
-                        <img id="uploadPreviewImg" class="hidden mt-3 max-h-32 rounded-xl border border-slate-700 object-contain shadow-lg">
-                    </div>
-
-                    <!-- Image URL Input Area -->
-                    <div id="imageUrlArea" class="hidden flex flex-col gap-2">
-                        <label class="block text-[11px] font-semibold text-slate-400">آدرس اینترنتی تصویر اولیه (URL)</label>
-                        <div class="flex gap-2">
-                            <input 
-                                id="imageUrlInput" 
-                                type="url" 
-                                placeholder="https://example.com/image.jpg" 
-                                class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                                onchange="handleUrlChange()">
-                            <button onclick="loadAndPreviewUrl()" class="px-4 py-2 bg-slate-850 hover:bg-slate-800 text-xs text-slate-300 rounded-xl border border-slate-700 transition">بارگذاری</button>
-                        </div>
-                        <img id="urlPreviewImg" class="hidden mt-2 mx-auto max-h-32 rounded-xl border border-slate-700 object-contain shadow-lg">
-                    </div>
-
-                    <!-- Image Prompt Preview Box (English translation generated by AI) -->
-                    <div class="bg-slate-950/40 p-3 rounded-xl border border-slate-850">
-                        <div class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 mb-1">
-                            <i data-lucide="terminal" class="w-3.5 h-3.5 text-brand-500"></i>
-                            <span>سناریو تصویرسازی تولید شده (به زبان انگلیسی):</span>
-                        </div>
-                        <p id="imagePromptText" class="text-xs text-slate-500 leading-relaxed italic truncate">جهت بارگذاری ابتدا فرآیند بازنویسی متن را شروع کنید...</p>
-                    </div>
-
-                    <!-- Action Trigger Button -->
-                    <button 
-                        id="generateImageBtn"
-                        onclick="generateFeaturedImage()" 
-                        class="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-brand-500 hover:from-emerald-500 hover:to-brand-400 text-slate-950 font-black rounded-2xl shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-2">
-                        <i data-lucide="image-plus" class="w-4 h-4"></i>
-                        <span>خلق شاهکار بصری (تصویر شاخص جدید)</span>
-                    </button>
-
-                    <!-- Generating Image Status -->
-                    <div id="imageGeneratingState" class="hidden flex flex-col items-center justify-center py-8 gap-4 bg-slate-950/50 rounded-2xl border border-slate-800">
-                        <div class="w-12 h-12 rounded-full border-2 border-brand-500 border-t-transparent animate-spin"></div>
-                        <div class="text-center">
-                            <span class="block text-xs font-bold text-slate-200 animate-pulse">هوش مصنوعی در حال بازسازی تصویر...</span>
-                            <span class="block text-[10px] text-slate-500 mt-1">تولید تصویر اختصاصی با رزولوشن افقی مناسب وب</span>
-                        </div>
-                    </div>
-
-                    <!-- Generated Output Display Area -->
-                    <div id="generatedImageContainer" class="hidden flex flex-col gap-3">
-                        <div class="relative group overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 aspect-[16/9]">
-                            <!-- Generated Image -->
-                            <img id="generatedImg" src="" alt="تصویر شاخص جدید سئو" class="w-full h-full object-cover transition-all duration-300">
-                            <!-- Overlay actions on hover -->
-                            <div class="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                <a id="downloadImgBtn" href="#" download="featured-image.png" class="px-4 py-2.5 bg-slate-900/90 text-xs text-white hover:bg-brand-500 hover:text-slate-950 rounded-xl transition flex items-center gap-1.5 font-bold shadow-lg">
-                                    <i data-lucide="download" class="w-4 h-4"></i>
-                                    <span>دانلود تصویر اصلی</span>
-                                </a>
-                            </div>
-                        </div>
-                        <div class="flex items-center justify-between text-[11px] text-slate-400 bg-slate-900/60 p-2 px-3 rounded-xl border border-slate-850">
-                            <span>فرمت: PNG (۱۶:۹)</span>
-                            <span class="text-brand-400 flex items-center gap-1">
-                                <i data-lucide="sparkles" class="w-3 h-3"></i>
-                                <span>کاملاً انحصاری و سئو شده</span>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-
-        </section>
-
-    </main>
-
-    <!-- API Settings Modal Dialog -->
-    <div id="apiModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] hidden flex items-center justify-center p-4 transition-all">
-        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl relative flex flex-col gap-4">
-            <button onclick="toggleApiModal()" class="absolute top-4 left-4 p-1.5 rounded-lg text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700 transition">
-                <i data-lucide="x" class="w-4 h-4"></i>
+        <div class="card">
+            <label>📝 متن ورودی</label>
+            <textarea id="inputText" rows="8" placeholder="متن خبر، مقاله یا یادداشت خود را اینجا بنویسید..."></textarea>
+            
+            <label style="margin-top: 16px;">🎭 لحن نگارش</label>
+            <select id="tone">
+                <option value="رسمی و خبری">رسمی و خبری</option>
+                <option value="تیتر زرد و جذاب">تیتر زرد و جذاب</option>
+                <option value="آموزشی و سئو شده">آموزشی و سئو شده</option>
+                <option value="موجز و شبکه‌های اجتماعی">موجز و شبکه‌های اجتماعی</option>
+            </select>
+            
+            <button onclick="rewriteText()" id="rewriteBtn">
+                🚀 بازنویسی هوشمند
             </button>
-            
-            <div class="flex items-center gap-3">
-                <div class="p-2 bg-amber-500/10 rounded-xl text-amber-400 border border-amber-500/20">
-                    <i data-lucide="settings" class="w-5 h-5"></i>
-                </div>
-                <div>
-                    <h3 class="font-bold text-slate-200">تنظیم کلید دستی هوش مصنوعی</h3>
-                    <p class="text-[10px] text-slate-400 mt-0.5">در صورت تمایل، کلید اختصاصی جمینای خود را وارد کنید</p>
-                </div>
-            </div>
+        </div>
 
-            <p class="text-xs text-slate-400 leading-relaxed bg-slate-950 p-3.5 rounded-xl border border-slate-850">
-                این اپلیکیشن به صورت خودکار از پروکسی سیستم برای ارتباط با هوش مصنوعی در زمان تست استفاده می‌کند. با این حال اگر می‌خواهید مستقیماً با سهمیه شخصی API خود پیش بروید، کلید اختصاصی خود را وارد نمایید.
-            </p>
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p style="color: #94a3b8;">در حال پردازش با Gemini 2.0...</p>
+        </div>
 
-            <div>
-                <label class="block text-xs font-semibold text-slate-400 mb-1.5">کلید Gemini API Key</label>
-                <input 
-                    id="apiKeyInput" 
-                    type="password" 
-                    placeholder="AIzaSy..." 
-                    class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-brand-500 placeholder-slate-600">
-            </div>
-
-            <div class="flex items-center justify-end gap-3 mt-2">
-                <button onclick="toggleApiModal()" class="px-4 py-2 rounded-xl text-xs text-slate-400 hover:bg-slate-800 transition">بستن</button>
-                <button onclick="saveApiKey()" class="px-5 py-2.5 rounded-xl text-xs bg-brand-500 text-slate-950 font-bold hover:bg-brand-400 transition">ذخیره تغییرات</button>
-            </div>
+        <div id="resultArea" class="card hidden">
+            <div id="resultContent"></div>
         </div>
     </div>
 
-    <!-- Toast Notification Container -->
-    <div id="toastContainer" class="fixed bottom-6 left-6 z-[200] flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
-
-    <!-- Footer -->
-    <footer class="border-t border-slate-850 py-4 bg-slate-950/60 px-4 text-center">
-        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-            <p>تمامی حقوق و کدهای پیرایشگر متعلق به توسعه‌دهنده وب‌اپلیکیشن است.</p>
-            <div class="flex items-center gap-4">
-                <span class="flex items-center gap-1 text-brand-500">
-                    <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
-                    <span>آماده کار مقتدرانه</span>
-                </span>
-                <span>توسعه‌یافته با موتور هوشمند Gemini</span>
-            </div>
-        </div>
-    </footer>
-
     <script>
-        // Global variables
-        let apiKey = localStorage.getItem('pirayeshgar_api_key') || '';
-        let rewriteHistory = JSON.parse(localStorage.getItem('pirayeshgar_history') || '[]');
-        let currentOutputMode = 'preview'; // 'preview' or 'edit'
-        let currentImageSource = 'text'; // 'text', 'upload', 'url'
-        let currentImagePrompt = ''; // English prompt generated by Rewrite stage
-        let uploadedImageBase64 = ''; // Base64 representation of uploaded image reference
-
-        // On window load
-        window.onload = function() {
-            // Load saved settings
-            const savedKeyInput = document.getElementById('apiKeyInput');
-            if (savedKeyInput) {
-                savedKeyInput.value = apiKey;
-            }
-            
-            // Populate initial visual stats
-            updateInputStats();
-            renderHistory();
-            
-            // Initialize Lucide Icons
-            lucide.createIcons();
-        }
-
-        // Show toast notification helper
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            toast.className = `p-3.5 rounded-xl border flex items-center gap-3 shadow-lg pointer-events-auto transform transition duration-300 translate-y-2 opacity-0`;
-            
-            if (type === 'success') {
-                toast.classList.add('bg-slate-900', 'border-brand-500/30', 'text-slate-200');
-                toast.innerHTML = `<i data-lucide="check-circle-2" class="w-5 h-5 text-brand-500"></i><span class="text-xs font-semibold">${message}</span>`;
-            } else if (type === 'error') {
-                toast.classList.add('bg-slate-900', 'border-rose-500/30', 'text-slate-200');
-                toast.innerHTML = `<i data-lucide="alert-triangle" class="w-5 h-5 text-rose-500"></i><span class="text-xs font-semibold">${message}</span>`;
+        function checkApiKey() {
+            const apiKey = document.getElementById('apiKey').value;
+            const statusDiv = document.getElementById('apiStatus');
+            if (apiKey && apiKey.startsWith('AIza')) {
+                statusDiv.innerHTML = '✅ کلید API معتبر است';
+                statusDiv.className = 'api-status status-ok';
+            } else if (apiKey) {
+                statusDiv.innerHTML = '⚠️ فرمت کلید صحیح نیست (باید با AIza شروع شود)';
+                statusDiv.className = 'api-status status-error';
             } else {
-                toast.classList.add('bg-slate-900', 'border-slate-800', 'text-slate-300');
-                toast.innerHTML = `<i data-lucide="info" class="w-5 h-5 text-blue-400"></i><span class="text-xs font-semibold">${message}</span>`;
+                statusDiv.innerHTML = '⚠️ لطفاً کلید API را وارد کنید';
+                statusDiv.className = 'api-status status-error';
             }
+        }
 
-            container.appendChild(toast);
-            lucide.createIcons();
+        document.getElementById('apiKey').addEventListener('input', checkApiKey);
+        checkApiKey();
+        
+        async function rewriteText() {
+            const text = document.getElementById('inputText').value;
+            const tone = document.getElementById('tone').value;
+            const apiKey = document.getElementById('apiKey').value;
+            const model = document.getElementById('model').value;
             
-            // Animate in
-            setTimeout(() => {
-                toast.classList.remove('translate-y-2', 'opacity-0');
-            }, 10);
-
-            // Auto dismiss after 3.5s
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'scale-95');
-                setTimeout(() => toast.remove(), 300);
-            }, 3500);
-        }
-
-        // UI state management functions
-        function updateInputStats() {
-            const input = document.getElementById('rawInput').value;
-            const charCount = input.length;
-            const wordCount = input.trim() === '' ? 0 : input.trim().split(/\s+/).length;
-            
-            document.getElementById('charCount').textContent = charCount.toLocaleString('fa-IR');
-            document.getElementById('wordCount').textContent = wordCount.toLocaleString('fa-IR');
-        }
-
-        function clearInput() {
-            document.getElementById('rawInput').value = '';
-            updateInputStats();
-            showToast('متن ورودی پاکسازی شد', 'info');
-        }
-
-        function toggleApiModal() {
-            const modal = document.getElementById('apiModal');
-            modal.classList.toggle('hidden');
-        }
-
-        function saveApiKey() {
-            const inputVal = document.getElementById('apiKeyInput').value.trim();
-            localStorage.setItem('pirayeshgar_api_key', inputVal);
-            apiKey = inputVal;
-            toggleApiModal();
-            showToast('تنظیمات کلید با موفقیت به‌روزرسانی شد');
-        }
-
-        // History management
-        function renderHistory() {
-            const container = document.getElementById('historyContainer');
-            if (rewriteHistory.length === 0) {
-                container.innerHTML = `<div class="text-slate-500 py-3 text-center">تاریخچه‌ای یافت نشد.</div>`;
-                return;
-            }
-
-            container.innerHTML = '';
-            rewriteHistory.forEach((item, index) => {
-                const previewText = item.rawInput.length > 45 ? item.rawInput.substring(0, 45) + '...' : item.rawInput;
-                const date = new Date(item.timestamp).toLocaleTimeString('fa-IR', {hour: '2-digit', minute:'2-digit'});
-                
-                const div = document.createElement('div');
-                div.className = `p-2.5 rounded-xl border border-slate-800 hover:border-slate-700/80 bg-slate-850/40 hover:bg-slate-800/40 cursor-pointer transition flex items-center justify-between gap-3 text-right`;
-                div.onclick = () => loadHistoryItem(index);
-                
-                div.innerHTML = `
-                    <div class="min-w-0 flex-1">
-                        <div class="font-semibold text-slate-300 truncate">${item.title}</div>
-                        <div class="text-[10px] text-slate-500 truncate mt-0.5">${previewText}</div>
-                    </div>
-                    <span class="text-[9px] text-slate-600 bg-slate-900 px-1.5 py-0.5 rounded-md shrink-0">${date}</span>
-                `;
-                container.appendChild(div);
-            });
-        }
-
-        function loadHistoryItem(index) {
-            const item = rewriteHistory[index];
-            document.getElementById('rawInput').value = item.rawInput;
-            updateInputStats();
-
-            // Set result fields
-            document.getElementById('seoTitleText').value = item.title;
-            document.getElementById('contentBodyRaw').value = item.content;
-            
-            // Render HTML preview directly (without markdown parser)
-            document.getElementById('contentPreviewContainer').innerHTML = item.content;
-            
-            // Keywords
-            document.getElementById('keywordsRaw').value = item.keywords.join(', ');
-            renderKeywordBadges(item.keywords);
-
-            // Store prompt for image generation
-            currentImagePrompt = item.image_prompt || '';
-            const promptBox = document.getElementById('imagePromptText');
-            if (promptBox && currentImagePrompt) {
-                promptBox.textContent = currentImagePrompt;
-                promptBox.classList.remove('truncate');
-            }
-
-            // Display outputs
-            document.getElementById('placeholderState').classList.add('hidden');
-            document.getElementById('loadingState').classList.add('hidden');
-            document.getElementById('resultState').classList.remove('hidden');
-
-            showToast('محتوای ذخیره شده بازیابی شد');
-        }
-
-        function saveToHistory(rawInput, title, content, keywords, image_prompt) {
-            rewriteHistory.unshift({
-                timestamp: Date.now(),
-                rawInput,
-                title,
-                content,
-                keywords,
-                image_prompt
-            });
-            // Limit history to 8 items
-            if (rewriteHistory.length > 8) {
-                rewriteHistory.pop();
-            }
-            localStorage.setItem('pirayeshgar_history', JSON.stringify(rewriteHistory));
-            renderHistory();
-        }
-
-        function clearHistory() {
-            rewriteHistory = [];
-            localStorage.removeItem('pirayeshgar_history');
-            renderHistory();
-            showToast('کل تاریخچه پاک شد', 'info');
-        }
-
-        // View modes for the output body
-        function setBodyMode(mode) {
-            currentOutputMode = mode;
-            const btnPreview = document.getElementById('btnModePreview');
-            const btnEdit = document.getElementById('btnModeEdit');
-            const containerPreview = document.getElementById('contentPreviewContainer');
-            const containerRaw = document.getElementById('contentBodyRaw');
-
-            if (mode === 'preview') {
-                btnPreview.className = "px-2.5 py-1 text-[10px] font-bold rounded-lg transition bg-brand-500 text-slate-950";
-                btnEdit.className = "px-2.5 py-1 text-[10px] font-medium text-slate-400 hover:text-slate-200 rounded-lg transition";
-                
-                // Directly show HTML from textarea into visual container
-                containerPreview.innerHTML = containerRaw.value;
-                containerPreview.classList.remove('hidden');
-                containerRaw.classList.add('hidden');
-            } else {
-                btnEdit.className = "px-2.5 py-1 text-[10px] font-bold rounded-lg transition bg-brand-500 text-slate-950";
-                btnPreview.className = "px-2.5 py-1 text-[10px] font-medium text-slate-400 hover:text-slate-200 rounded-lg transition";
-                
-                containerRaw.classList.remove('hidden');
-                containerPreview.classList.add('hidden');
-            }
-        }
-
-        function syncPreviewFromRaw() {
-            // Live sync of code edits to visual HTML representation
-            const rawText = document.getElementById('contentBodyRaw').value;
-            document.getElementById('contentPreviewContainer').innerHTML = rawText;
-        }
-
-        function renderKeywordBadges(keywords) {
-            const container = document.getElementById('keywordsBadges');
-            container.innerHTML = '';
-            keywords.forEach(keyword => {
-                const span = document.createElement('span');
-                span.className = `text-xs bg-brand-500/10 text-brand-400 border border-brand-500/20 px-3 py-1.5 rounded-xl hover:bg-brand-500/20 transition cursor-pointer flex items-center gap-1`;
-                span.innerHTML = `# ${keyword}`;
-                span.onclick = () => {
-                    navigator.clipboard.writeText(keyword);
-                    showToast(`کلیدواژه "${keyword}" کپی شد`);
-                }
-                container.appendChild(span);
-            });
-        }
-
-        // Toggle Featured Image Source Tab
-        function setImageSource(source) {
-            currentImageSource = source;
-            const btnText = document.getElementById('btnImgText');
-            const btnUpload = document.getElementById('btnImgUpload');
-            const btnUrl = document.getElementById('btnImgUrl');
-            
-            const areaUpload = document.getElementById('imageUploadArea');
-            const areaUrl = document.getElementById('imageUrlArea');
-
-            // Reset buttons UI
-            [btnText, btnUpload, btnUrl].forEach(btn => {
-                btn.className = "py-2 rounded-xl transition text-slate-400 hover:text-slate-200";
-            });
-
-            // Set Active UI
-            if (source === 'text') {
-                btnText.className = "py-2 rounded-xl transition font-bold bg-brand-500 text-slate-950";
-                areaUpload.classList.add('hidden');
-                areaUrl.classList.add('hidden');
-            } else if (source === 'upload') {
-                btnUpload.className = "py-2 rounded-xl transition font-bold bg-brand-500 text-slate-950";
-                areaUpload.classList.remove('hidden');
-                areaUrl.classList.add('hidden');
-            } else if (source === 'url') {
-                btnUrl.className = "py-2 rounded-xl transition font-bold bg-brand-500 text-slate-950";
-                areaUpload.classList.add('hidden');
-                areaUrl.classList.remove('hidden');
-            }
-        }
-
-        // File Selection Utilities
-        function triggerFileInput() {
-            document.getElementById('imageFileInput').click();
-        }
-
-        function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            if (file.size > 4 * 1024 * 1024) {
-                showToast("حجم فایل انتخابی نباید بیشتر از ۴ مگابایت باشد.", "error");
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                uploadedImageBase64 = e.target.result;
-                const previewImg = document.getElementById('uploadPreviewImg');
-                previewImg.src = uploadedImageBase64;
-                previewImg.classList.remove('hidden');
-                document.getElementById('uploadStatusText').textContent = `تصویر "${file.name}" بارگذاری شد`;
-                showToast("تصویر مرجع با موفقیت اضافه شد");
-            }
-            reader.readAsDataURL(file);
-        }
-
-        // URL Image Utilities
-        function handleUrlChange() {
-            const url = document.getElementById('imageUrlInput').value.trim();
-            if (!url) return;
-            loadAndPreviewUrl(url);
-        }
-
-        function loadAndPreviewUrl(urlStr) {
-            const url = urlStr || document.getElementById('imageUrlInput').value.trim();
-            if (!url) {
-                showToast("ابتدا آدرس معتبر تصویر را وارد کنید.", "error");
+            if (!text.trim()) {
+                alert('لطفاً متن خود را وارد کنید');
                 return;
             }
             
-            const previewImg = document.getElementById('urlPreviewImg');
-            previewImg.src = url;
-            previewImg.classList.remove('hidden');
-            previewImg.onerror = function() {
-                showToast("امکان خوانش مستقیم تصویر از این آدرس وجود ندارد (خطای بارگذاری).", "error");
-                previewImg.classList.add('hidden');
-            }
-            previewImg.onload = function() {
-                showToast("پیش‌نمایش تصویر اینترنتی فعال شد.");
-            }
-        }
-
-        // Main integration of the Rewrite Processor powered by Gemini
-        async function processRewrite() {
-            const rawText = document.getElementById('rawInput').value.trim();
-            if (!rawText) {
-                showToast('لطفاً ابتدا متنی برای بازنویسی وارد نمایید', 'error');
+            if (!apiKey) {
+                alert('لطفاً کلید API را وارد کنید');
                 return;
             }
-
-            const placeholder = document.getElementById('placeholderState');
-            const loading = document.getElementById('loadingState');
-            const result = document.getElementById('resultState');
-            const submitBtn = document.getElementById('submitBtn');
-
-            // Toggle states
-            placeholder.classList.add('hidden');
-            result.classList.add('hidden');
-            loading.classList.remove('hidden');
-            submitBtn.disabled = true;
-            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-
-            const tone = document.getElementById('toneSelect').value;
-            const grammarStyle = document.getElementById('grammarStrictness').value;
-
-            // Simple loading simulation texts
-            const statusTexts = [
-                "در حال تحلیل ساختار خبر ورودی...",
-                "شناسایی کلیدواژه‌های استراتژیک...",
-                "تطبیق نگارش بر مبنای قواعد وب پارسی...",
-                "کادربندی هدینگ‌های سئو...",
-                "ایجاد ایده تصویرسازی شاخص...",
-                "اتمام کار و استخراج نهایی..."
-            ];
-            let statusIdx = 0;
-            const statusTimer = setInterval(() => {
-                if (statusIdx < statusTexts.length - 1) {
-                    statusIdx++;
-                    document.getElementById('loadingStatusText').textContent = statusTexts[statusIdx];
-                }
-            }, 800);
-
-            // Construct System prompt & User prompt with HTML constraints and strict 3-4 keywords rule
-            const systemPrompt = `
-شما یک سردبیر و خبرنگار حرفه‌ای، باسابقه و متخصص سئو (SEO) در وب فارسی هستید.
-وظیفه شما بازنویسی متن‌های دریافتی به شیوه‌ای کاملاً حرفه‌ای، جذاب، خبرنگاری و کاملاً بهینه‌سازی شده برای موتورهای جستجو است.
-
-قوانین سفت و سخت نگارشی و فرمت‌بندی:
-۱. علائم نگارشی را کاملاً در مکان مناسب قرار دهید.
-۲. رعایت دقیق نیم‌فاصله‌ها الزامی است (به عنوان مثال: مِی‌شود به "می‌شود"؛‌ها به "ها"؛ کتاب‌های به "کتاب‌های" و غیره).
-۳. به هیچ وجه از ساختارهای مارک‌داون (مانند علائم ##، ###، *، ** یا خطوط تیره) استفاده نکنید. متن خروجی باید کاملاً در قالب کدهای استاندارد HTML تمیز و خوانا (مانند تگ‌های <h2>، <h3>، <p>، <strong>، <ul>، <li>) باشد تا مستقیماً قابل انتشار باشد. از تگ <h1> استفاده نکنید.
-۴. یک عنوان جذاب با نرخ کلیک (CTR) فوق‌العاده بالا به زبان روزنامه‌نگاری سئومحور ایجاد کنید.
-۵. دقیقاً بین ۳ تا ۴ کلمه کلیدی (نه بیشتر و نه کمتر) بسیار مهم، استراتژیک و با جستجوی بالا (LSI) که بر روی سئو متن بیشترین تاثیر را دارند استخراج کنید.
-۶. همچنین بر اساس عنوان و محتوای نهایی یک پرامپت انگلیسی فوق‌العاده دقیق، برای هوش مصنوعی تصویرساز (Imagen 4) جهت طراحی «تصویر شاخص مطبوعاتی» (Featured Image) بنویسید. پرامپت باید برای تصویر عریض ۱۶:۹ بدون متن و با سبک تصویرسازی برداری مدرن یا عکاسی دراماتیک ژورنالیستی باشد.
-
-شما باید پاسخ خود را دقیقاً بر اساس یک طرحواره معتبر JSON بازگردانید. خروجی باید کاملاً یک ساختار JSON تمیز باشد و هیچ توضیح اضافی خارج از آن نباشد.
-`;
-
-            const userPrompt = `
-لطفاً متن زیر را با لحن "${tone}" و سخت‌گیری سجاوندی "${grammarStyle}" بازنویسی کنید.
-متن خام جهت پردازش:
-"${rawText}"
-`;
-
-            // Setup API Parameters & Endpoint
-            const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-
-            const payload = {
-                contents: [{ parts: [{ text: userPrompt }] }],
-                generationConfig: {
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: "OBJECT",
-                        properties: {
-                            "title": { "type": "STRING", "description": "SEO-optimized title in Persian (not including colon, markdown or HTML tags)" },
-                            "content": { "type": "STRING", "description": "Professional rewritten journalistic text strictly in HTML format (using only <h2>, <h3>, <p>, <strong>, <ul>, <li> tags). Do not use markdown characters like #, ##, or *." },
-                            "keywords": {
-                                "type": "ARRAY",
-                                "items": { "type": "STRING" },
-                                "description": "Strictly 3 to 4 highly impactful, relevant, and strategic Persian SEO keywords"
-                            },
-                            "image_prompt": {
-                                "type": "STRING",
-                                "description": "A highly detailed English prompt for generating a modern 16:9 news featured image without any text, in modern editorial vector or realistic style."
-                            }
-                        },
-                        required: ["title", "content", "keywords", "image_prompt"]
-                    }
-                },
-                systemInstruction: {
-                    parts: [{ text: systemPrompt }]
-                }
-            };
-
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('rewriteBtn').disabled = true;
+            document.getElementById('resultArea').classList.add('hidden');
+            
             try {
-                // Fetch with exponential backoff strategy for robustness
-                const fetchWithRetry = async (url, options, retries = 3, delay = 1000) => {
-                    try {
-                        const res = await fetch(url, options);
-                        if (!res.ok) {
-                            if (retries > 0 && res.status === 429) {
-                                await new Promise(resolve => setTimeout(resolve, delay));
-                                return fetchWithRetry(url, options, retries - 1, delay * 2);
-                            }
-                            throw new Error(`خطای سرور: ${res.status}`);
-                        }
-                        return res;
-                    } catch (err) {
-                        if (retries > 0) {
-                            await new Promise(resolve => setTimeout(resolve, delay));
-                            return fetchWithRetry(url, options, retries - 1, delay * 2);
-                        }
-                        throw err;
-                    }
-                };
-
-                const response = await fetchWithRetry(apiEndpoint, {
+                const response = await fetch('/api/rewrite', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({ text, tone, apiKey, model })
                 });
-
-                const resultJson = await response.json();
-                const candidate = resultJson.candidates?.[0];
-
-                if (candidate && candidate.content?.parts?.[0]?.text) {
-                    const parsedData = JSON.parse(candidate.content.parts[0].text);
-                    
-                    // Assign results
-                    document.getElementById('seoTitleText').value = parsedData.title;
-                    document.getElementById('contentBodyRaw').value = parsedData.content;
-                    
-                    // Render HTML directly without converting via marked.js
-                    document.getElementById('contentPreviewContainer').innerHTML = parsedData.content;
-                    
-                    // Render keywords
-                    document.getElementById('keywordsRaw').value = parsedData.keywords.join(', ');
-                    renderKeywordBadges(parsedData.keywords);
-
-                    // Setup Image generation prompt
-                    currentImagePrompt = parsedData.image_prompt || '';
-                    const promptBox = document.getElementById('imagePromptText');
-                    promptBox.textContent = currentImagePrompt;
-                    promptBox.classList.remove('truncate');
-
-                    // Reset view mode to default preview
-                    setBodyMode('preview');
-
-                    // Save to history
-                    saveToHistory(rawText, parsedData.title, parsedData.content, parsedData.keywords, parsedData.image_prompt);
-
-                    // Switch states
-                    loading.classList.add('hidden');
-                    result.classList.remove('hidden');
-                    showToast('عملیات بازنویسی و اصلاح سئو با موفقیت کامل شد!');
-                } else {
-                    throw new Error('قالب داده پاسخ هوش مصنوعی مورد تایید نبود.');
-                }
-
-            } catch (error) {
-                console.error(error);
-                loading.classList.add('hidden');
-                placeholder.classList.remove('hidden');
-                showToast(`خطایی رخ داد: ${error.message}. لطفاً مجدداً تلاش کنید یا از بخش بالای صفحه کلید API اختصاصی خود را تنظیم نمایید.`, 'error');
-            } finally {
-                clearInterval(statusTimer);
-                submitBtn.disabled = false;
-                submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            }
-        }
-
-        // NEW: Image Generation integration utilizing Imagen 4 & Gemini Vision
-        async function generateFeaturedImage() {
-            const generateImageBtn = document.getElementById('generateImageBtn');
-            const generatingState = document.getElementById('imageGeneratingState');
-            const outputContainer = document.getElementById('generatedImageContainer');
-            
-            const currentTitle = document.getElementById('seoTitleText').value.trim();
-            if (!currentTitle) {
-                showToast("ابتدا متن را بازنویسی کنید تا سناریوی تصویر تولید شود.", "error");
-                return;
-            }
-
-            // Lock UI
-            generateImageBtn.disabled = true;
-            generateImageBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            generatingState.classList.remove('hidden');
-            outputContainer.classList.add('hidden');
-
-            try {
-                let finalPrompt = currentImagePrompt;
-
-                // Handle visual reference if image is uploaded
-                if (currentImageSource === 'upload' && uploadedImageBase64) {
-                    showToast("در حال آنالیز تصویر مرجع با Gemini Vision...");
-                    
-                    // Clean base64 prefix
-                    const base64Data = uploadedImageBase64.split(',')[1];
-                    const mimeType = uploadedImageBase64.split(';')[0].split(':')[1] || 'image/png';
-
-                    const geminiVisionEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-                    
-                    const visionPayload = {
-                        contents: [
-                            {
-                                role: "user",
-                                                    parts: [
-                                                        { text: `Analyze this image in relation to the news article title: "${currentTitle}". Create a highly detailed, professional, and modern editorial featured image prompt in English for Imagen 4. The prompt should recreate and improve this exact visual concept to match the news title, aiming for a professional, crisp news illustration or photo, with 16:9 ratio. Do not output any text in the image. Return ONLY the English prompt, no extra dialogue.` },
-                                                        { inlineData: { mimeType: mimeType, data: base64Data } }
-                                                    ]
-                                                }
-                                            ]
-                                        };
-
-                    const visionRes = await fetch(geminiVisionEndpoint, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(visionPayload)
-                    });
-
-                    if (visionRes.ok) {
-                        const visionData = await visionRes.json();
-                        const candidateText = visionData.candidates?.[0]?.content?.parts?.[0]?.text;
-                        if (candidateText) {
-                            finalPrompt = candidateText.trim();
-                            document.getElementById('imagePromptText').textContent = finalPrompt;
-                            showToast("آنالیز تصویر مرجع پایان یافت؛ آغاز فرایند تصویرسازی...");
-                        }
-                    } else {
-                        console.warn("Gemini Vision failed. Falling back to default text prompt.");
-                        showToast("کمی اختلال در آنالیز تصویر مرجع؛ با پرامپت متنی بازسازی می‌شود.", "info");
-                    }
-                } else if (currentImageSource === 'url') {
-                    const urlInput = document.getElementById('imageUrlInput').value.trim();
-                    if (urlInput) {
-                        finalPrompt += `. Recreate the concept inspired by this original visual elements: ${urlInput}`;
-                    }
-                }
-
-                if (!finalPrompt) {
-                    finalPrompt = `Editorial featured news image, clean professional digital art style, representing theme: ${currentTitle}, beautiful colors, 16:9 widescreen layout, highly detailed, no text.`;
-                }
-
-                // Call Imagen 4.0 API
-                const imagenEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
                 
-                const imagenPayload = {
-                    instances: [
-                        {
-                            prompt: finalPrompt
-                        }
-                    ],
-                    parameters: {
-                        sampleCount: 1,
-                        aspectRatio: "16:9",
-                        outputMimeType: "image/png"
+                const data = await response.json();
+                
+                if (data.success) {
+                    let keywordsHtml = '<div style="margin-top: 16px;"><strong>🔑 کلمات کلیدی:</strong><br>';
+                    for (let i = 0; i < data.data.keywords.length; i++) {
+                        keywordsHtml += '<span class="keyword">#' + data.data.keywords[i] + '</span>';
                     }
-                };
-
-                const imagenResponse = await fetch(imagenEndpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(imagenPayload)
-                });
-
-                if (!imagenResponse.ok) {
-                    throw new Error(`خطای پردازش تصویر: ${imagenResponse.status}`);
-                }
-
-                const imagenData = await imagenResponse.json();
-                const b64Bytes = imagenData.predictions?.[0]?.bytesBase64Encoded;
-
-                if (b64Bytes) {
-                    const finalImageSrc = `data:image/png;base64,${b64Bytes}`;
+                    keywordsHtml += '</div>';
                     
-                    // Render image
-                    const generatedImg = document.getElementById('generatedImg');
-                    generatedImg.src = finalImageSrc;
+                    const resultHtml = '<h2>📰 ' + data.data.title + '</h2>' +
+                        '<div class="result-area">' + data.data.content + '</div>' +
+                        keywordsHtml;
                     
-                    // Setup Download Button
-                    const downloadBtn = document.getElementById('downloadImgBtn');
-                    downloadBtn.href = finalImageSrc;
-                    
-                    // Display result
-                    generatingState.classList.add('hidden');
-                    outputContainer.classList.remove('hidden');
-                    showToast("تصویر شاخص هوشمند با موفقیت خلق شد!");
+                    document.getElementById('resultContent').innerHTML = resultHtml;
+                    document.getElementById('resultArea').classList.remove('hidden');
                 } else {
-                    throw new Error("داده تصویر از سرور دریافت نشد.");
+                    throw new Error(data.error || 'خطای ناشناخته');
                 }
-
+                
             } catch (error) {
-                console.error(error);
-                generatingState.classList.add('hidden');
-                showToast(`خطایی در خلق تصویر رخ داد: ${error.message}`, 'error');
+                const errorHtml = '<div class="error">❌ خطا: ' + error.message + '</div>';
+                document.getElementById('resultContent').innerHTML = errorHtml;
+                document.getElementById('resultArea').classList.remove('hidden');
             } finally {
-                generateImageBtn.disabled = false;
-                generateImageBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('rewriteBtn').disabled = false;
             }
-        }
-
-        // Safe Copy function adhering to iframe constraints
-        function copyField(elementId, iconId) {
-            const element = document.getElementById(elementId);
-            if (!element) return;
-
-            // Create temporary textarea element to safely copy text inside restricted sandbox environments
-            const tempTextArea = document.createElement("textarea");
-            tempTextArea.value = element.value || element.textContent;
-            // Prevent scrolling
-            tempTextArea.style.top = "0";
-            tempTextArea.style.left = "0";
-            tempTextArea.style.position = "fixed";
-            
-            document.body.appendChild(tempTextArea);
-            tempTextArea.focus();
-            tempTextArea.select();
-
-            try {
-                const successful = document.execCommand('copy');
-                if (successful) {
-                    showToast('محتوای فیلد با موفقیت کپی شد');
-                    
-                    // Toggle copy icon visual confirmation
-                    const icon = document.getElementById(iconId);
-                    if (icon) {
-                        icon.setAttribute('data-lucide', 'check');
-                        icon.classList.add('text-brand-400');
-                        lucide.createIcons();
-                        
-                        setTimeout(() => {
-                            icon.setAttribute('data-lucide', 'copy');
-                            icon.classList.remove('text-brand-400');
-                            lucide.createIcons();
-                        }, 2000);
-                    }
-                } else {
-                    showToast('خطا در کپی خودکار. لطفاً دستی متن را انتخاب نمایید.', 'error');
-                }
-            } catch (err) {
-                showToast('خطا در اجرای فرآیند کپی', 'error');
-            }
-
-            document.body.removeChild(tempTextArea);
         }
     </script>
 </body>
