@@ -279,19 +279,98 @@ bot.on('message', async (msg) => {
   }
 });
 
+const ADMIN_MENU_BUTTONS = [
+  '📢 مدیریت کانال‌ها', '📦 مدیریت کانفیگ‌ها',
+  '🔄 مدیریت ساب', '🔗 مدیریت پروکسی',
+  '➕ اضافه کردن کانال', '➖ حذف کانال',
+  '➕ اضافه کردن کانفیگ', '➖ حذف کانفیگ',
+  '➕ اضافه کردن ساب', '➖ حذف ساب',
+  '➕ اضافه کردن پروکسی', '➖ حذف پروکسی',
+  '⚙️ پنل مدیریت', '🔙 بازگشت'
+];
+
 async function handleAdminState(userId, chatId, text, userState) {
+  if (text === '✖️ لغو' || ADMIN_MENU_BUTTONS.includes(text)) {
+    if (text === '✖️ لغو') {
+      clearUserState(userId);
+      await bot.sendMessage(chatId, '❌ عملیات لغو شد.', getAdminKeyboard());
+      return;
+    }
+
+    if (text === '🔙 بازگشت') {
+      clearUserState(userId);
+      await bot.sendMessage(chatId, '🏠 منوی اصلی', getMainKeyboard(userId));
+      return;
+    }
+
+    clearUserState(userId);
+    if (text === '📢 مدیریت کانال‌ها') { await showChannelManagement(chatId); return; }
+    if (text === '📦 مدیریت کانفیگ‌ها') { await showConfigManagement(chatId); return; }
+    if (text === '🔄 مدیریت ساب') { await showSubManagement(chatId); return; }
+    if (text === '🔗 مدیریت پروکسی') { await showProxyManagement(chatId); return; }
+
+    if (text === '➕ اضافه کردن کانفیگ') {
+      setUserState(userId, 'add_config_input');
+      await bot.sendMessage(chatId, '📝 متن کانفیگ v2ray را ارسال کنید:', {
+        reply_markup: { keyboard: [[{ text: '✖️ لغو' }]], resize_keyboard: true }
+      });
+      return;
+    }
+    if (text === '➖ حذف کانفیگ') {
+      setUserState(userId, 'delete_config_input');
+      await bot.sendMessage(chatId, '🔢 شناسه (ID) کانفیگ مورد نظر را وارد کنید:', {
+        reply_markup: { keyboard: [[{ text: '✖️ لغو' }]], resize_keyboard: true }
+      });
+      return;
+    }
+    if (text === '➕ اضافه کردن پروکسی') {
+      setUserState(userId, 'add_proxy_input');
+      await bot.sendMessage(chatId, '📝 لینک پروکسی تلگرام را ارسال کنید:', {
+        reply_markup: { keyboard: [[{ text: '✖️ لغو' }]], resize_keyboard: true }
+      });
+      return;
+    }
+    if (text === '➖ حذف پروکسی') {
+      setUserState(userId, 'delete_proxy_input');
+      await bot.sendMessage(chatId, '🔢 شناسه (ID) پروکسی مورد نظر را وارد کنید:', {
+        reply_markup: { keyboard: [[{ text: '✖️ لغو' }]], resize_keyboard: true }
+      });
+      return;
+    }
+    if (text === '➕ اضافه کردن ساب') {
+      setUserState(userId, 'add_sub_link_input');
+      await bot.sendMessage(chatId, '📝 لینک ساب را ارسال کنید:', {
+        reply_markup: { keyboard: [[{ text: '✖️ لغو' }]], resize_keyboard: true }
+      });
+      return;
+    }
+    if (text === '➖ حذف ساب') {
+      setUserState(userId, 'delete_sub_input');
+      await bot.sendMessage(chatId, '🔢 شناسه (ID) ساب مورد نظر را وارد کنید:', {
+        reply_markup: { keyboard: [[{ text: '✖️ لغو' }]], resize_keyboard: true }
+      });
+      return;
+    }
+    if (text === '➕ اضافه کردن کانال') {
+      setUserState(userId, 'add_channel_input');
+      await bot.sendMessage(chatId, '📝 آیدی عددی یا یوزرنیم کانال را ارسال کنید (مثال: @mychannel یا -1001234567890):', {
+        reply_markup: { keyboard: [[{ text: '✖️ لغو' }]], resize_keyboard: true }
+      });
+      return;
+    }
+    if (text === '➖ حذف کانال') {
+      setUserState(userId, 'delete_channel_input');
+      await bot.sendMessage(chatId, '🔢 آیدی کانال مورد نظر را وارد کنید:', {
+        reply_markup: { keyboard: [[{ text: '✖️ لغو' }]], resize_keyboard: true }
+      });
+      return;
+    }
+
+    return;
+  }
+
   switch (userState.step) {
-    case 'add_channel':
-      if (text === '✖️ لغو') {
-        clearUserState(userId);
-        await bot.sendMessage(chatId, '❌ عملیات لغو شد.', getAdminKeyboard());
-        return;
-      }
-      const channelMatch = text.match(/(-?\d+)|@(\w+)/);
-      if (!channelMatch) {
-        await bot.sendMessage(chatId, '❌ فرمت نامعتبر. آیدی عددی یوزرنیم کانال را وارد کنید (مثال: @mychannel یا -1001234567890)');
-        return;
-      }
+    case 'add_channel_input': {
       try {
         const chat = await bot.getChat(text);
         db.prepare('INSERT OR IGNORE INTO channels (channel_id, channel_title) VALUES (?, ?)').run(text, chat.title || text);
@@ -301,97 +380,63 @@ async function handleAdminState(userId, chatId, text, userState) {
         await bot.sendMessage(chatId, '❌ خطا در اضافه کردن کانال. مطمئن شوید ربات در کانال ادمین است.');
       }
       break;
+    }
 
-    case 'add_config':
-      if (text === '✖️ لغو') {
-        clearUserState(userId);
-        await bot.sendMessage(chatId, '❌ عملیات لغو شد.', getAdminKeyboard());
-        return;
-      }
+    case 'add_config_input':
       db.prepare('INSERT INTO configs (config_text) VALUES (?)').run(text);
       clearUserState(userId);
       await bot.sendMessage(chatId, '✅ کانفیگ اضافه شد.', getAdminKeyboard());
       break;
 
-    case 'add_sub_link':
-      if (text === '✖️ لغو') {
-        clearUserState(userId);
-        await bot.sendMessage(chatId, '❌ عملیات لغو شد.', getAdminKeyboard());
-        return;
-      }
-      setUserState(userId, 'add_sub_qr', { sub_link: text });
+    case 'add_sub_link_input':
+      setUserState(userId, 'add_sub_qr_input', { sub_link: text });
       await bot.sendMessage(chatId, '📱 QR کد ساب (اختیاری):\nاگر QR ندارید عبارت "-" را وارد کنید:', {
         reply_markup: { keyboard: [[{ text: '✖️ لغو' }]], resize_keyboard: true }
       });
       break;
 
-    case 'add_sub_qr':
-      if (text === '✖️ لغو') {
-        clearUserState(userId);
-        await bot.sendMessage(chatId, '❌ عملیات لغو شد.', getAdminKeyboard());
-        return;
-      }
+    case 'add_sub_qr_input': {
       const subLink = userState.data.sub_link;
       const qr = text === '-' ? '' : text;
       db.prepare('INSERT INTO subscriptions (sub_link, qr_code) VALUES (?, ?)').run(subLink, qr);
       clearUserState(userId);
       await bot.sendMessage(chatId, '✅ لینک ساب اضافه شد.', getAdminKeyboard());
       break;
+    }
 
-    case 'add_proxy':
-      if (text === '✖️ لغو') {
-        clearUserState(userId);
-        await bot.sendMessage(chatId, '❌ عملیات لغو شد.', getAdminKeyboard());
-        return;
-      }
+    case 'add_proxy_input':
       db.prepare('INSERT INTO proxies (proxy_link) VALUES (?)').run(text);
       clearUserState(userId);
       await bot.sendMessage(chatId, '✅ پروکسی اضافه شد.', getAdminKeyboard());
       break;
 
-    case 'delete_channel':
-      if (text === '✖️ لغو') {
-        clearUserState(userId);
-        await bot.sendMessage(chatId, '❌ عملیات لغو شد.', getAdminKeyboard());
-        return;
-      }
+    case 'delete_channel_input': {
       const deleted = db.prepare('DELETE FROM channels WHERE channel_id = ?').run(text);
       clearUserState(userId);
       await bot.sendMessage(chatId, deleted.changes ? '✅ کانال حذف شد.' : '❌ کانال یافت نشد.', getAdminKeyboard());
       break;
+    }
 
-    case 'delete_config':
-      if (text === '✖️ لغو') {
-        clearUserState(userId);
-        await bot.sendMessage(chatId, '❌ عملیات لغو شد.', getAdminKeyboard());
-        return;
-      }
+    case 'delete_config_input': {
       const delConfig = db.prepare('DELETE FROM configs WHERE id = ?').run(parseInt(text));
       clearUserState(userId);
       await bot.sendMessage(chatId, delConfig.changes ? '✅ کانفیگ حذف شد.' : '❌ کانفیگ یافت نشد.', getAdminKeyboard());
       break;
+    }
 
-    case 'delete_sub':
-      if (text === '✖️ لغو') {
-        clearUserState(userId);
-        await bot.sendMessage(chatId, '❌ عملیات لغو شد.', getAdminKeyboard());
-        return;
-      }
+    case 'delete_sub_input': {
       const delSub = db.prepare('DELETE FROM subscriptions WHERE id = ?').run(parseInt(text));
       clearUserState(userId);
       await bot.sendMessage(chatId, delSub.changes ? '✅ ساب حذف شد.' : '❌ ساب یافت نشد.', getAdminKeyboard());
       break;
+    }
 
-    case 'delete_proxy':
-      if (text === '✖️ لغو') {
-        clearUserState(userId);
-        await bot.sendMessage(chatId, '❌ عملیات لغو شد.', getAdminKeyboard());
-        return;
-      }
+    case 'delete_proxy_input': {
       const delProxy = db.prepare('DELETE FROM proxies WHERE id = ?').run(parseInt(text));
       clearUserState(userId);
       await bot.sendMessage(chatId, delProxy.changes ? '✅ پروکسی حذف شد.' : '❌ پروکسی یافت نشد.', getAdminKeyboard());
       break;
+    }
   }
 }
 
@@ -405,7 +450,7 @@ async function showChannelManagement(chatId) {
       text += `${i + 1}. ${ch.channel_title || ch.channel_id} (${ch.channel_id})\n`;
     });
   }
-  text += '\nبرای اضافه کردن کانال آیدی یا یوزرنیم آن را ارسال کنید.';
+  setUserState(chatId, 'channel_menu');
   await bot.sendMessage(chatId, text, {
     reply_markup: {
       keyboard: [
@@ -415,7 +460,6 @@ async function showChannelManagement(chatId) {
       resize_keyboard: true
     }
   });
-  setUserState(chatId, 'add_channel');
 }
 
 async function showConfigManagement(chatId) {
@@ -427,7 +471,7 @@ async function showConfigManagement(chatId) {
       text += `${i + 1}. ID: ${c.id} | ${c.config_text.substring(0, 30)}...\n`;
     });
   }
-  text += '\nبرای اضافه کردن، متن کانفیگ را ارسال کنید.';
+  setUserState(chatId, 'config_menu');
   await bot.sendMessage(chatId, text, {
     reply_markup: {
       keyboard: [
@@ -437,7 +481,6 @@ async function showConfigManagement(chatId) {
       resize_keyboard: true
     }
   });
-  setUserState(chatId, 'add_config');
 }
 
 async function showSubManagement(chatId) {
@@ -450,7 +493,7 @@ async function showSubManagement(chatId) {
       text += `${i + 1}. ID: ${s.id} | ${s.sub_link.substring(0, 40)}...\n`;
     });
   }
-  text += '\nبرای اضافه کردن، لینک ساب را ارسال کنید.';
+  setUserState(chatId, 'sub_menu');
   await bot.sendMessage(chatId, text, {
     reply_markup: {
       keyboard: [
@@ -460,7 +503,6 @@ async function showSubManagement(chatId) {
       resize_keyboard: true
     }
   });
-  setUserState(chatId, 'add_sub_link');
 }
 
 async function showProxyManagement(chatId) {
@@ -472,7 +514,7 @@ async function showProxyManagement(chatId) {
       text += `${i + 1}. ID: ${p.id} | ${p.proxy_link.substring(0, 40)}...\n`;
     });
   }
-  text += '\nبرای اضافه کردن، لینک پروکسی را ارسال کنید.';
+  setUserState(chatId, 'proxy_menu');
   await bot.sendMessage(chatId, text, {
     reply_markup: {
       keyboard: [
@@ -482,7 +524,6 @@ async function showProxyManagement(chatId) {
       resize_keyboard: true
     }
   });
-  setUserState(chatId, 'add_proxy');
 }
 
 async function handleConfigRequest(chatId, userId) {
