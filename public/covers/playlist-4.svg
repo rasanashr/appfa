@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
+  <rect width="300" height="300" fill="#ff6b35"/>
+  <rect width="300" height="300" fill="url(#grad-playlist-4)" opacity="0.3"/>
+  <defs>
+    <radialGradient id="grad-playlist-4" cx="30%" cy="30%">
+      <stop offset="0%" stop-color="#004e64" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#ff6b35" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="110" y="110" width="80" height="80" fill="#004e64" opacity="0.4" transform="rotate(45 150 150)"/>
+        <rect x="40" y="40" width="50" height="50" fill="#004e64" opacity="0.2" transform="rotate(45 65 65)"/>
+        <rect x="210" y="210" width="50" height="50" fill="#004e64" opacity="0.2" transform="rotate(45 235 235)"/>
+</svg>
